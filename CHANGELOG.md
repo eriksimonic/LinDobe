@@ -1,11 +1,13 @@
 # Changelog
 
-## 0.5.1 - 2026-10-31
+## 0.5.2 - 2026-10-31
 
 - **Flatpak: apps that need Microsoft's Visual C++ runtime now start.** The Flatpak's space-saving links made
   Microsoft's redistributable fail, so Lightroom stopped at once with "mfc140u.dll not found". Updating repairs
   existing setups; after updating, open Creative Cloud and install or update an app so it can run the
   redistributable again.
+- **Blank licensing window fixed for good:** Adobe's Chromium licensing window draws nothing under Wine, and `fix-signin` looked in the wrong folder. The launcher now switches to the working one at every start, because Creative Cloud restores the file when it updates.
+- Known: Adobe's "too many devices" page still can't draw. Sign out of a device at account.adobe.com instead.
 - Photoshop's contextual task bar no longer floats above other apps and takes their clicks (0104).
 
 ## 0.5.0 - 2026-10-31

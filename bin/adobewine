@@ -17,6 +17,13 @@ latest() {
   local d; d="$(ls -d "$WINEPREFIX/drive_c/Program Files/Adobe/$1 20"[0-9][0-9] 2>/dev/null | sort -V | tail -1)"
   basename "${d:-$1 2026}"
 }
+use_ie_licensing() {  # Adobe's Chromium licensing window draws nothing under Wine; without it Adobe uses the IE one
+  local f r=1
+  for f in "$WINEPREFIX/drive_c/Program Files"*"/Common Files/Adobe/Adobe Desktop Common/NGL/adobe_licensing_wf.exe"; do
+    [ -f "$f" ] && mv -f "$f" "$f.disabled" && r=0
+  done
+  return $r
+}
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 case "$cmd" in
   photoshop)   exe="$P\\$(latest "Adobe Photoshop")\\Photoshop.exe" ;;
@@ -54,12 +61,13 @@ case "$cmd" in
     # Adobe's licensing window comes in two flavours; the Chromium one does not draw under
     # Wine, the Internet Explorer engine one does. Renaming the Chromium helper makes Adobe's
     # sign-in library fall back to the IE one. Your sign-in and licence are unchanged.
-    f="$WINEPREFIX/drive_c/Program Files (x86)/Common Files/Adobe/Adobe Desktop Common/NGL/adobe_licensing_wf.exe"
-    [ -f "$f" ] && mv "$f" "$f.disabled" && echo "done" || echo "nothing to do (helper not present or already renamed)"
+    use_ie_licensing && echo "done" || echo "nothing to do (helper not present or already renamed)"
     exit 0 ;;
   ""|-h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) echo "unknown command: $cmd (try adobewine --help)" >&2; exit 1 ;;
 esac
+# Creative Cloud restores the helper when it updates itself, so this runs at every start.
+use_ie_licensing || true
 # Linux paths (from a file manager or a .desktop %F) become Windows paths.
 args=()
 for a in "$@"; do
