@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 - 2026-10-31
 
+- **Flatpak: apps that need Microsoft's Visual C++ runtime now start.** The Flatpak's space-saving links made
+  Microsoft's redistributable fail, so Lightroom stopped at once with "mfc140u.dll not found". Updating repairs
+  existing setups; after updating, open Creative Cloud and install or update an app so it can run the
+  redistributable again.
 - Photoshop's contextual task bar no longer floats above other apps and takes their clicks (0104).
 
 ## 0.5.0 - 2026-10-31

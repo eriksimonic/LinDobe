@@ -68,7 +68,7 @@ checkout of the AUR package installs them without building anything.
 > package from the [release](https://github.com/le-birnes/AdobeWine/releases). pacman fetches the dependencies:
 >
 > ```sh
-> sudo pacman -U https://github.com/le-birnes/AdobeWine/releases/download/v0.5.0/adobewine-0.5.0-1-x86_64.pkg.tar.zst
+> sudo pacman -U https://github.com/le-birnes/AdobeWine/releases/download/v0.5.1/adobewine-0.5.1-1-x86_64.pkg.tar.zst
 > ```
 >
 > Or build it from this repository:

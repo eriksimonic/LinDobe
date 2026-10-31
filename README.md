@@ -13,7 +13,7 @@ AI was used as a tool to build it, and we say so plainly: see [Why this exists](
 **See it in action:** [a short showreel (1:24)](https://youtu.be/3Vbzt4cGSQQ), made entirely in these apps on
 Linux, from the painting to the final export.
 
-> **Still early (0.5.0).** AdobeWine is built and tested day to day on one Arch-based laptop (CachyOS, NVIDIA RTX
+> **Still early (0.5.1).** AdobeWine is built and tested day to day on one Arch-based laptop (CachyOS, NVIDIA RTX
 > 4070). The installer also runs on Fedora, Ubuntu, Debian, Linux Mint, openSUSE and others, but those have had less
 > real-world use. If you try it, please tell us how it went, good or bad: it really helps.
 
@@ -77,7 +77,7 @@ Details for each app: [docs/STATUS.md](docs/STATUS.md).
 - **Arch Linux, CachyOS, EndeavourOS, Manjaro, Garuda:** one command, on the platform AdobeWine is developed on:
 
   ```sh
-  sudo pacman -U https://github.com/le-birnes/AdobeWine/releases/download/v0.5.0/adobewine-0.5.0-1-x86_64.pkg.tar.zst
+  sudo pacman -U https://github.com/le-birnes/AdobeWine/releases/download/v0.5.1/adobewine-0.5.1-1-x86_64.pkg.tar.zst
   adobewine setup
   ```
 
@@ -108,7 +108,7 @@ make it work for everyone else.
 ## How it works (for the curious)
 
 AdobeWine is [Wine](https://www.winehq.org) 11.20, the compatibility layer that also runs Windows games on Steam,
-plus 101 fixes for what Adobe's apps need. Each fix comes from comparing the same task on Windows and under Wine,
+plus 102 fixes for what Adobe's apps need. Each fix comes from comparing the same task on Windows and under Wine,
 with a small test program that shows the difference. Every fix is listed in [docs/PATCHES.md](docs/PATCHES.md), the
 method is in [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md), and the code is public under Wine's own license. WineHQ doesn't accept AI-written code, so these fixes aren't
 submitted there. Which Windows functions Adobe's apps call, and what happens with each one, is

@@ -200,6 +200,13 @@ if [ "${ADOBEWINE_LINK_DLLS:-0}" = 1 ]; then
     dst="$WINEPREFIX/drive_c/windows/${pair%%:*}" src="$ADOBEWINE_RUNTIME/lib/wine/${pair##*:}"
     for f in "$src"/*; do
       t="$dst/${f##*/}"
+      # Microsoft's VC++ redistributable replaces these. A link into read-only /app makes it fail (error 1603),
+      # which leaves no MFC and Lightroom cannot start. Keep real files, and repair prefixes linked before 0.5.1.
+      case "${f##*/}" in
+        concrt140.dll|msvcp140*.dll|ucrtbase.dll|vcamp140.dll|vccorlib140.dll|vcomp140.dll|vcruntime140*.dll)
+          [ -L "$t" ] && rm "$t" && cp "$f" "$t"
+          continue ;;
+      esac
       [ -f "$t" ] && [ ! -L "$t" ] && cmp -s "$f" "$t" && ln -sf "$f" "$t" && n=$((n + 1))
     done
   done
