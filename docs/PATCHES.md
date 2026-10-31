@@ -106,3 +106,4 @@ to WineHQ; help with that is very welcome.
 | 0101 | various | Functions Adobe's apps import that Wine lacked: implemented, forwarded, or answering "nothing here" (docs/DLL-MAP.md) |
 | 0102 | various | Stubs from subsystems Wine lacks return an error instead of aborting the process. The subsystems still do not work |
 | 0103 | crypt32, wintrust | Two signature-check bugs: Acrobat crashed at start, acrotray and AdobeCollabSync aborted |
+| 0104 | winex11 | Photoshop's contextual task bar stays with Photoshop instead of above every other app |

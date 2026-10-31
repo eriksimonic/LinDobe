@@ -1,0 +1,23 @@
+From: AdobeWine
+Subject: [PATCH] winex11: an owned popup with a dialog frame is managed.
+
+Unmanaged windows stay above every other application under X, and Photoshop's contextual task bar (WS_POPUP,
+WS_EX_DLGMODALFRAME, owned by the main window, never activated) sat over other apps and took their clicks. Managed, it
+is a transient of its owner and follows it. Menus and tooltips have no dialog frame and stay unmanaged.
+Test: on a hidden screen, the bar is no longer override-redirect, leaves with Photoshop, Ctrl+I works after a click on it.
+
+---
+diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
+--- a/dlls/winex11.drv/window.c
++++ b/dlls/winex11.drv/window.c
+@@ -472,6 +472,10 @@
+     {
+         HWND owner = NtUserGetWindowRelative( hwnd, GW_OWNER );
+         if (owner && (NtUserGetWindowLongW( owner, GWL_EXSTYLE ) & WS_EX_LAYERED)) return TRUE;
++        /* a dialog-framed popup with an owner is a palette: it follows the owner in the window
++         * manager's stacking. Unmanaged it stays above every other application (Photoshop's
++         * contextual task bar). */
++        if (owner && (ex_style & WS_EX_DLGMODALFRAME)) return TRUE;
+     }
+     /* default: not managed */
+     return FALSE;

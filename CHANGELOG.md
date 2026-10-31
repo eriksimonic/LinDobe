@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Photoshop's contextual task bar no longer floats above other apps and takes their clicks (0104).
+
 ## 0.5.0 - 2026-10-31
 
 - **Five more apps in the menu and the AdobeWine window:** InDesign, Bridge, Lightroom Classic, Lightroom and Acrobat.
