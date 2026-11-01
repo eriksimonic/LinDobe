@@ -16,7 +16,7 @@ First steps for any problem:
 | The Creative Cloud installer stays on "Loading..." | `adobewine setup` installs wine-gecko; run it again and check its output |
 | The sign-in window is blank or white | Close it, `adobewine fix-signin`, then `adobewine cc` |
 | Adobe says you have too many devices | Since 0.5.3 the page draws. Choose a device to sign out of there, or do it at [account.adobe.com](https://account.adobe.com). The page's Quit button does nothing yet: close it with the X on the window |
-| The Adobe installer stays on "Loading..." | It waited too long at sign-in. Close it, open AdobeWine again and sign in straight away |
+| Adobe's sign-in says "Session timed out", or stays on "Loading..." | It waited too long, about 15 minutes. Retry may do nothing. Close the installer with the X, choose Quit, open AdobeWine again and click "Download and install Creative Cloud" |
 | The small Creative Cloud web installer (about 3 MB) shows only a white window | Fixed for build 2.14.0.82 (found by NickPittas, [#2](../../../issues/2)): patches 0055-0057 (AdobeWine 0.2.0 and later). If it still stays white, use Adobe's Creative Cloud **offline installer** (search Adobe Help for "Creative Cloud offline installer") and run it with `adobewine run`. Only use installers from adobe.com |
 | Creative Cloud's Apps tab stays on its placeholder the first time | Click Home, then Apps again |
 | An app says it is not licensed | Sign out and in again in Creative Cloud (avatar menu); the apps take the licence from it |
