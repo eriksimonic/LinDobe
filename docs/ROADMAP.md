@@ -30,7 +30,7 @@ Beyond the per-app checklists, five gates apply to all apps:
 Apps in scope: Creative Cloud desktop, Photoshop (with Camera Raw), Illustrator, Premiere
 Pro, Media Encoder, Audition, After Effects, InDesign, Bridge.
 
-## Where we are (October 2026)
+## Where we are (November 2026)
 
 | App | Core functions | Full checklist (tested / known) | Notes |
 |---|---|---|---|
@@ -42,10 +42,13 @@ Pro, Media Encoder, Audition, After Effects, InDesign, Bridge.
 | Audition | 10/10 | 10 / 498 | |
 | After Effects | partial | being inventoried | renders since 0.2.2 (Render Queue crash fixed, patch 0061); a real 300-layer comp matches the Windows render. Scripting, keyframes, panels work |
 | InDesign | not scored yet | | lays out and exports: styles, tables, placed PSD/AI files, PDF and PNG (used in the [showreel](https://youtu.be/3Vbzt4cGSQQ)) |
-| Bridge | opens | 0 / 149 | |
+| Bridge | opens | 27 / 149 | 26 of the most-used functions pass |
+| Lightroom Classic | | | 21 of the most-used functions pass |
+| Lightroom | | | 12 functions pass by hand |
+| Acrobat | | | 22 of the most-used functions pass |
 
 The full checklists come from the Windows inventories (menus, filters, effects, presets...): 3213
-known functions so far, 136 tested (4%). That is the real starting line, and most of what is
+known functions so far, 163 tested (5%). That is the real starting line, and most of what is
 untested has simply not been run yet, not found broken.
 
 "Core functions" are the 10-11 everyday functions per app in [STATUS.md](STATUS.md). They
