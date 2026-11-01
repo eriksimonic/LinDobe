@@ -42,6 +42,6 @@ pkgbase = adobewine-bin
 	options = !strip
 	options = !debug
 	source = https://github.com/le-birnes/LinDobe/releases/download/v0.5.5/adobewine-0.5.5-x86_64.tar.zst
-	sha256sums = 78231c11911d81e65aadc0a7a0b4f3ce0c4a299e21680cdb56551efe763c431f
+	sha256sums = dcf707348ae9d0924cba478994ed4ff57bcb2472a385afca63f753cf1d220cde
 
 pkgname = adobewine-bin
