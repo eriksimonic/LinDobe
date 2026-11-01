@@ -1,6 +1,6 @@
 # Maintainer: AdobeWine contributors (see https://github.com/le-birnes/AdobeWine)
 pkgname=adobewine
-pkgver=0.5.3
+pkgver=0.5.4
 _winever=11.20
 pkgrel=1
 pkgdesc="AdobeWine: Wine ${_winever} with patches for Adobe Creative Cloud apps (Photoshop, Illustrator, Premiere Pro, Audition, Media Encoder)"

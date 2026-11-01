@@ -1,0 +1,21 @@
+From: AdobeWine
+Subject: [PATCH] ntdll: fall back to /etc/machine-id for the system UUID.
+
+Flatpak sandboxes have no /var/lib/dbus/machine-id, so the SMBIOS UUID and board
+serial became placeholders and Adobe licensing saw the machine as a new device.
+
+Test: wmic csproduct get uuid gives the same value in the sandbox and out of it; Lightroom no device limit page.
+---
+--- a/dlls/ntdll/unix/system.c
++++ b/dlls/ntdll/unix/system.c
+@@ -2239,7 +2239,9 @@
+     int fd;
+ 
+     memset( uuid, 0xff, sizeof(*uuid) );
+-    if ((fd = open( "/var/lib/dbus/machine-id", O_RDONLY )) != -1)
++    /* a Flatpak sandbox only has /etc/machine-id; same value, so the machine stays the same one for licensing */
++    if ((fd = open( "/var/lib/dbus/machine-id", O_RDONLY )) != -1 ||
++        (fd = open( "/etc/machine-id", O_RDONLY )) != -1)
+     {
+         unsigned char buf[32], *p = buf;
+         if (read( fd, buf, sizeof(buf) ) == sizeof(buf))

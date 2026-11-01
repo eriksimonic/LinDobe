@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.4 - 2026-11-01
+
+- **The Flatpak no longer looks like a different computer to Adobe.** Wine read the machine ID from a file Flatpak
+  sandboxes don't have, so it reported a placeholder, and Adobe counted the Flatpak as a new device. That could use up
+  one of your two device slots and open the "too many devices" page. Wine now uses `/etc/machine-id`, so the Flatpak and
+  a native install on the same computer report the same machine (0107). If you already activated Adobe in the Flatpak,
+  it will count as a new device once after this update.
+
 ## 0.5.3 - 2026-11-01
 
 - **Adobe's "too many devices" page now draws.** It was blank, which left you stuck when Adobe asked you to sign out of
