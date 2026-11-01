@@ -1,0 +1,940 @@
+From: AdobeWine
+Subject: [PATCH] mshtml: add document.createTreeWalker and NodeFilter, and accept URLs of any length.
+
+Adobe's device limit page (the overactivation workflow in the IE licensing window) stayed blank. Its script walks
+the page with createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false): neither exists in Wine (documentmode.js
+lists createTreeWalker for IE9+). The walker follows the DOM traversal algorithms over nsIDOMNode, with the filter as
+a function or as an object with acceptNode. NodeFilter is the plain object with its constants, as on IE.
+After sign-in that page's URL carries a token and is longer than 2084 characters. nsIOServiceHook_NewURI converted it
+into a WCHAR[INTERNET_MAX_URL_LENGTH] on the stack; MultiByteToWideChar stopped at the end without a terminator, so
+location.href ended in the saved return address and the page's encodeURIComponent threw. The buffer now fits the URL.
+Test: wine/tests/treewalker/tw.html, every walk matches the DOM rules; the device page draws with its devices.
+
+---
+--- a/dlls/mshtml/htmldoc.c
++++ b/dlls/mshtml/htmldoc.c
+@@ -5267,6 +5267,40 @@
+     return hres;
+ }
+ 
++static inline HTMLDocumentNode *impl_from_IWineDocumentTraversal(IWineDocumentTraversal *iface)
++{
++    return CONTAINING_RECORD(iface, HTMLDocumentNode, IWineDocumentTraversal_iface);
++}
++
++DISPEX_IDISPATCH_IMPL(DocumentTraversal, IWineDocumentTraversal,
++                      impl_from_IWineDocumentTraversal(iface)->node.event_target.dispex)
++
++static HRESULT WINAPI DocumentTraversal_createTreeWalker(IWineDocumentTraversal *iface, IHTMLDOMNode *root,
++        VARIANT *what_to_show, VARIANT *filter, VARIANT *expand, IWineDOMTreeWalker **p)
++{
++    HTMLDocumentNode *This = impl_from_IWineDocumentTraversal(iface);
++    HTMLDOMNode *node = root ? unsafe_impl_from_IHTMLDOMNode(root) : NULL;
++
++    TRACE("(%p)->(%p %s %s %s %p)\n", This, root, debugstr_variant(what_to_show), debugstr_variant(filter),
++          debugstr_variant(expand), p);
++
++    if(!node)
++        return E_INVALIDARG;
++
++    return create_tree_walker(This, node, what_to_show, filter, expand, p);
++}
++
++static const IWineDocumentTraversalVtbl DocumentTraversalVtbl = {
++    DocumentTraversal_QueryInterface,
++    DocumentTraversal_AddRef,
++    DocumentTraversal_Release,
++    DocumentTraversal_GetTypeInfoCount,
++    DocumentTraversal_GetTypeInfo,
++    DocumentTraversal_GetIDsOfNames,
++    DocumentTraversal_Invoke,
++    DocumentTraversal_createTreeWalker
++};
++
+ static const IDocumentRangeVtbl DocumentRangeVtbl = {
+     DocumentRange_QueryInterface,
+     DocumentRange_AddRef,
+@@ -5393,6 +5427,8 @@
+         return &This->IDisplayServices_iface;
+     if(IsEqualGUID(&IID_IDocumentRange, riid))
+         return &This->IDocumentRange_iface;
++    if(IsEqualGUID(&IID_IWineDocumentTraversal, riid))
++        return &This->IWineDocumentTraversal_iface;
+     if(IsEqualGUID(&IID_IPersist, riid))
+         return &This->IPersistFile_iface;
+     if(IsEqualGUID(&IID_IPersistMoniker, riid))
+@@ -5874,6 +5910,7 @@
+     if(mode >= COMPAT_MODE_IE9) {
+         dispex_info_add_interface(info, IHTMLDocument7_tid, NULL);
+         dispex_info_add_interface(info, IDocumentEvent_tid, NULL);
++        dispex_info_add_interface(info, IWineDocumentTraversal_tid, NULL);
+     }
+ 
+     /* Depending on compatibility version, we add interfaces in different order
+@@ -5948,6 +5985,7 @@
+     doc->IMarkupContainer_iface.lpVtbl = &MarkupContainerVtbl;
+     doc->IDisplayServices_iface.lpVtbl = &DisplayServicesVtbl;
+     doc->IDocumentRange_iface.lpVtbl = &DocumentRangeVtbl;
++    doc->IWineDocumentTraversal_iface.lpVtbl = &DocumentTraversalVtbl;
+ 
+     doc->doc_obj = doc_obj;
+     doc->window = window;
+--- a/dlls/mshtml/htmlnode.c
++++ b/dlls/mshtml/htmlnode.c
+@@ -1698,3 +1698,621 @@
+     IHTMLDOMNode_Release(&document->node.IHTMLDOMNode_iface);
+     return hres;
+ }
++
++#define SHOW_EVERYTHING 0xffffffff
++#define FILTER_ACCEPT 1
++#define FILTER_REJECT 2
++#define FILTER_SKIP   3
++
++struct tree_walker {
++    DispatchEx dispex;
++    IWineDOMTreeWalker IWineDOMTreeWalker_iface;
++
++    HTMLDocumentNode *doc;
++    nsIDOMNode *root;
++    nsIDOMNode *current;
++    ULONG what_to_show;
++    IDispatch *filter;
++    VARIANT_BOOL expand;
++};
++
++static inline struct tree_walker *impl_from_IWineDOMTreeWalker(IWineDOMTreeWalker *iface)
++{
++    return CONTAINING_RECORD(iface, struct tree_walker, IWineDOMTreeWalker_iface);
++}
++
++DISPEX_IDISPATCH_IMPL(tree_walker, IWineDOMTreeWalker, impl_from_IWineDOMTreeWalker(iface)->dispex)
++
++static nsIDOMNode *node_parent(nsIDOMNode *node)
++{
++    nsIDOMNode *ret = NULL;
++    nsIDOMNode_GetParentNode(node, &ret);
++    return ret;
++}
++
++static nsIDOMNode *node_child(nsIDOMNode *node, BOOL last)
++{
++    nsIDOMNode *ret = NULL;
++    if(last)
++        nsIDOMNode_GetLastChild(node, &ret);
++    else
++        nsIDOMNode_GetFirstChild(node, &ret);
++    return ret;
++}
++
++static nsIDOMNode *node_sibling(nsIDOMNode *node, BOOL prev)
++{
++    nsIDOMNode *ret = NULL;
++    if(prev)
++        nsIDOMNode_GetPreviousSibling(node, &ret);
++    else
++        nsIDOMNode_GetNextSibling(node, &ret);
++    return ret;
++}
++
++/* takes the reference of next */
++static inline void node_replace(nsIDOMNode **node, nsIDOMNode *next)
++{
++    if(*node)
++        nsIDOMNode_Release(*node);
++    *node = next;
++}
++
++static HRESULT node_to_iface(nsIDOMNode *nsnode, IHTMLDOMNode **p)
++{
++    HTMLDOMNode *node;
++    HRESULT hres;
++
++    hres = get_node(nsnode, TRUE, &node);
++    if(SUCCEEDED(hres))
++        *p = &node->IHTMLDOMNode_iface;
++    return hres;
++}
++
++static HRESULT tree_walker_filter(struct tree_walker *This, nsIDOMNode *nsnode, LONG *result)
++{
++    static const WCHAR *accept_node = L"acceptNode";
++    DISPPARAMS dp = {NULL, NULL, 1, 0};
++    IHTMLDOMNode *node;
++    EXCEPINFO ei = {0};
++    DISPID dispid;
++    UINT16 type;
++    VARIANT arg, res;
++    HRESULT hres;
++
++    nsIDOMNode_GetNodeType(nsnode, &type);
++    if(type < 1 || type > 32 || !(This->what_to_show & (1u << (type - 1)))) {
++        *result = FILTER_SKIP;
++        return S_OK;
++    }
++    if(!This->filter) {
++        *result = FILTER_ACCEPT;
++        return S_OK;
++    }
++
++    hres = node_to_iface(nsnode, &node);
++    if(FAILED(hres))
++        return hres;
++
++    V_VT(&arg) = VT_DISPATCH;
++    V_DISPATCH(&arg) = (IDispatch*)node;
++    dp.rgvarg = &arg;
++    V_VT(&res) = VT_EMPTY;
++
++    /* the filter is either a function or an object with acceptNode */
++    if(SUCCEEDED(IDispatch_GetIDsOfNames(This->filter, &IID_NULL, (WCHAR**)&accept_node, 1, 0, &dispid)))
++        hres = IDispatch_Invoke(This->filter, dispid, &IID_NULL, GetUserDefaultLCID(), DISPATCH_METHOD,
++                                &dp, &res, &ei, NULL);
++    else
++        hres = call_disp_func(This->filter, &dp, &res);
++    IHTMLDOMNode_Release(node);
++    if(FAILED(hres))
++        return hres;
++
++    hres = VariantChangeType(&res, &res, 0, VT_I4);
++    *result = SUCCEEDED(hres) ? V_I4(&res) : FILTER_SKIP;
++    VariantClear(&res);
++    return S_OK;
++}
++
++/* takes the reference of node; NULL means the walk is over and currentNode stays */
++static HRESULT tree_walker_finish(struct tree_walker *This, nsIDOMNode *node, IHTMLDOMNode **p)
++{
++    *p = NULL;
++    if(!node)
++        return S_OK;
++    node_replace(&This->current, node);
++    return node_to_iface(node, p);
++}
++
++static HRESULT tree_walker_children(struct tree_walker *This, BOOL last, IHTMLDOMNode **p)
++{
++    nsIDOMNode *node, *next;
++    LONG result;
++    HRESULT hres;
++
++    node = node_child(This->current, last);
++    while(node) {
++        hres = tree_walker_filter(This, node, &result);
++        if(FAILED(hres)) {
++            nsIDOMNode_Release(node);
++            return hres;
++        }
++        if(result == FILTER_ACCEPT)
++            return tree_walker_finish(This, node, p);
++        if(result == FILTER_SKIP && (next = node_child(node, last))) {
++            node_replace(&node, next);
++            continue;
++        }
++        while(node) {
++            if((next = node_sibling(node, last))) {
++                node_replace(&node, next);
++                break;
++            }
++            next = node_parent(node);
++            if(!next || next == This->root || next == This->current) {
++                if(next)
++                    nsIDOMNode_Release(next);
++                nsIDOMNode_Release(node);
++                *p = NULL;
++                return S_OK;
++            }
++            node_replace(&node, next);
++        }
++    }
++    *p = NULL;
++    return S_OK;
++}
++
++static HRESULT tree_walker_siblings(struct tree_walker *This, BOOL prev, IHTMLDOMNode **p)
++{
++    nsIDOMNode *node, *sibling, *next;
++    LONG result;
++    HRESULT hres;
++
++    *p = NULL;
++    if(This->current == This->root)
++        return S_OK;
++
++    nsIDOMNode_AddRef(node = This->current);
++    for(;;) {
++        sibling = node_sibling(node, prev);
++        while(sibling) {
++            node_replace(&node, sibling);
++            hres = tree_walker_filter(This, node, &result);
++            if(FAILED(hres))
++                goto done;
++            if(result == FILTER_ACCEPT)
++                return tree_walker_finish(This, node, p);
++            sibling = result == FILTER_REJECT ? NULL : node_child(node, prev);
++            if(!sibling)
++                sibling = node_sibling(node, prev);
++        }
++        next = node_parent(node);
++        node_replace(&node, next);
++        if(!node || node == This->root)
++            break;
++        hres = tree_walker_filter(This, node, &result);
++        if(FAILED(hres))
++            goto done;
++        if(result == FILTER_ACCEPT)
++            break;
++    }
++    hres = S_OK;
++done:
++    if(node)
++        nsIDOMNode_Release(node);
++    return hres;
++}
++
++static HRESULT WINAPI tree_walker_get_root(IWineDOMTreeWalker *iface, IHTMLDOMNode **p)
++{
++    return node_to_iface(impl_from_IWineDOMTreeWalker(iface)->root, p);
++}
++
++static HRESULT WINAPI tree_walker_get_whatToShow(IWineDOMTreeWalker *iface, ULONG *p)
++{
++    *p = impl_from_IWineDOMTreeWalker(iface)->what_to_show;
++    return S_OK;
++}
++
++static HRESULT WINAPI tree_walker_get_filter(IWineDOMTreeWalker *iface, IDispatch **p)
++{
++    struct tree_walker *This = impl_from_IWineDOMTreeWalker(iface);
++
++    if((*p = This->filter))
++        IDispatch_AddRef(*p);
++    return S_OK;
++}
++
++static HRESULT WINAPI tree_walker_get_expandEntityReferences(IWineDOMTreeWalker *iface, VARIANT_BOOL *p)
++{
++    *p = impl_from_IWineDOMTreeWalker(iface)->expand;
++    return S_OK;
++}
++
++static HRESULT WINAPI tree_walker_get_currentNode(IWineDOMTreeWalker *iface, IDispatch **p)
++{
++    return node_to_iface(impl_from_IWineDOMTreeWalker(iface)->current, (IHTMLDOMNode**)p);
++}
++
++static HRESULT WINAPI tree_walker_put_currentNode(IWineDOMTreeWalker *iface, IDispatch *v)
++{
++    struct tree_walker *This = impl_from_IWineDOMTreeWalker(iface);
++    IHTMLDOMNode *iface_node;
++    HTMLDOMNode *node;
++
++    if(!v || FAILED(IDispatch_QueryInterface(v, &IID_IHTMLDOMNode, (void**)&iface_node)))
++        return E_INVALIDARG;
++    if((node = unsafe_impl_from_IHTMLDOMNode(iface_node))) {
++        nsIDOMNode_AddRef(node->nsnode);
++        node_replace(&This->current, node->nsnode);
++    }
++    IHTMLDOMNode_Release(iface_node);
++    return node ? S_OK : E_INVALIDARG;
++}
++
++static HRESULT WINAPI tree_walker_parentNode(IWineDOMTreeWalker *iface, IHTMLDOMNode **p)
++{
++    struct tree_walker *This = impl_from_IWineDOMTreeWalker(iface);
++    nsIDOMNode *node;
++    LONG result;
++    HRESULT hres;
++
++    *p = NULL;
++    nsIDOMNode_AddRef(node = This->current);
++    while(node && node != This->root) {
++        node_replace(&node, node_parent(node));
++        if(!node)
++            return S_OK;
++        hres = tree_walker_filter(This, node, &result);
++        if(FAILED(hres)) {
++            nsIDOMNode_Release(node);
++            return hres;
++        }
++        if(result == FILTER_ACCEPT)
++            return tree_walker_finish(This, node, p);
++    }
++    if(node)
++        nsIDOMNode_Release(node);
++    return S_OK;
++}
++
++static HRESULT WINAPI tree_walker_firstChild(IWineDOMTreeWalker *iface, IHTMLDOMNode **p)
++{
++    return tree_walker_children(impl_from_IWineDOMTreeWalker(iface), FALSE, p);
++}
++
++static HRESULT WINAPI tree_walker_lastChild(IWineDOMTreeWalker *iface, IHTMLDOMNode **p)
++{
++    return tree_walker_children(impl_from_IWineDOMTreeWalker(iface), TRUE, p);
++}
++
++static HRESULT WINAPI tree_walker_previousSibling(IWineDOMTreeWalker *iface, IHTMLDOMNode **p)
++{
++    return tree_walker_siblings(impl_from_IWineDOMTreeWalker(iface), TRUE, p);
++}
++
++static HRESULT WINAPI tree_walker_nextSibling(IWineDOMTreeWalker *iface, IHTMLDOMNode **p)
++{
++    return tree_walker_siblings(impl_from_IWineDOMTreeWalker(iface), FALSE, p);
++}
++
++static HRESULT WINAPI tree_walker_previousNode(IWineDOMTreeWalker *iface, IHTMLDOMNode **p)
++{
++    struct tree_walker *This = impl_from_IWineDOMTreeWalker(iface);
++    nsIDOMNode *node, *sibling, *child;
++    LONG result;
++    HRESULT hres = S_OK;
++
++    *p = NULL;
++    nsIDOMNode_AddRef(node = This->current);
++    while(node != This->root) {
++        sibling = node_sibling(node, TRUE);
++        while(sibling) {
++            node_replace(&node, sibling);
++            hres = tree_walker_filter(This, node, &result);
++            if(FAILED(hres))
++                goto done;
++            while(result != FILTER_REJECT && (child = node_child(node, TRUE))) {
++                node_replace(&node, child);
++                hres = tree_walker_filter(This, node, &result);
++                if(FAILED(hres))
++                    goto done;
++            }
++            if(result == FILTER_ACCEPT)
++                return tree_walker_finish(This, node, p);
++            sibling = node_sibling(node, TRUE);
++        }
++        if(node == This->root || !(child = node_parent(node)))
++            break;
++        node_replace(&node, child);
++        hres = tree_walker_filter(This, node, &result);
++        if(FAILED(hres))
++            break;
++        if(result == FILTER_ACCEPT)
++            return tree_walker_finish(This, node, p);
++    }
++done:
++    nsIDOMNode_Release(node);
++    return hres;
++}
++
++static HRESULT WINAPI tree_walker_nextNode(IWineDOMTreeWalker *iface, IHTMLDOMNode **p)
++{
++    struct tree_walker *This = impl_from_IWineDOMTreeWalker(iface);
++    nsIDOMNode *node, *next, *temp;
++    LONG result = FILTER_ACCEPT;
++    HRESULT hres = S_OK;
++
++    *p = NULL;
++    nsIDOMNode_AddRef(node = This->current);
++    for(;;) {
++        while(result != FILTER_REJECT && (next = node_child(node, FALSE))) {
++            node_replace(&node, next);
++            hres = tree_walker_filter(This, node, &result);
++            if(FAILED(hres))
++                goto done;
++            if(result == FILTER_ACCEPT)
++                return tree_walker_finish(This, node, p);
++        }
++
++        next = NULL;
++        nsIDOMNode_AddRef(temp = node);
++        while(temp && temp != This->root && !(next = node_sibling(temp, FALSE)))
++            node_replace(&temp, node_parent(temp));
++        if(temp)
++            nsIDOMNode_Release(temp);
++        if(!next)
++            goto done;
++
++        node_replace(&node, next);
++        hres = tree_walker_filter(This, node, &result);
++        if(FAILED(hres))
++            goto done;
++        if(result == FILTER_ACCEPT)
++            return tree_walker_finish(This, node, p);
++    }
++done:
++    nsIDOMNode_Release(node);
++    return hres;
++}
++
++static const IWineDOMTreeWalkerVtbl WineDOMTreeWalkerVtbl = {
++    tree_walker_QueryInterface,
++    tree_walker_AddRef,
++    tree_walker_Release,
++    tree_walker_GetTypeInfoCount,
++    tree_walker_GetTypeInfo,
++    tree_walker_GetIDsOfNames,
++    tree_walker_Invoke,
++    tree_walker_get_root,
++    tree_walker_get_whatToShow,
++    tree_walker_get_filter,
++    tree_walker_get_expandEntityReferences,
++    tree_walker_get_currentNode,
++    tree_walker_put_currentNode,
++    tree_walker_parentNode,
++    tree_walker_firstChild,
++    tree_walker_lastChild,
++    tree_walker_previousSibling,
++    tree_walker_nextSibling,
++    tree_walker_previousNode,
++    tree_walker_nextNode
++};
++
++static inline struct tree_walker *tree_walker_from_DispatchEx(DispatchEx *iface)
++{
++    return CONTAINING_RECORD(iface, struct tree_walker, dispex);
++}
++
++static void *tree_walker_query_interface(DispatchEx *dispex, REFIID riid)
++{
++    struct tree_walker *This = tree_walker_from_DispatchEx(dispex);
++
++    if(IsEqualGUID(&IID_IWineDOMTreeWalker, riid))
++        return &This->IWineDOMTreeWalker_iface;
++    return NULL;
++}
++
++static void tree_walker_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
++{
++    struct tree_walker *This = tree_walker_from_DispatchEx(dispex);
++
++    if(This->doc)
++        note_cc_edge((nsISupports*)&This->doc->node.IHTMLDOMNode_iface, "doc", cb);
++    if(This->root)
++        note_cc_edge((nsISupports*)This->root, "root", cb);
++    if(This->current)
++        note_cc_edge((nsISupports*)This->current, "current", cb);
++    if(This->filter)
++        note_cc_edge((nsISupports*)This->filter, "filter", cb);
++}
++
++static void tree_walker_unlink(DispatchEx *dispex)
++{
++    struct tree_walker *This = tree_walker_from_DispatchEx(dispex);
++
++    if(This->doc) {
++        HTMLDocumentNode *doc = This->doc;
++        This->doc = NULL;
++        IHTMLDOMNode_Release(&doc->node.IHTMLDOMNode_iface);
++    }
++    unlink_ref(&This->root);
++    unlink_ref(&This->current);
++    unlink_ref(&This->filter);
++}
++
++static void tree_walker_destructor(DispatchEx *dispex)
++{
++    free(tree_walker_from_DispatchEx(dispex));
++}
++
++static const dispex_static_data_vtbl_t tree_walker_dispex_vtbl = {
++    .query_interface  = tree_walker_query_interface,
++    .destructor       = tree_walker_destructor,
++    .traverse         = tree_walker_traverse,
++    .unlink           = tree_walker_unlink
++};
++
++static const tid_t TreeWalker_iface_tids[] = {
++    IWineDOMTreeWalker_tid,
++    0
++};
++
++dispex_static_data_t TreeWalker_dispex = {
++    .id              = OBJID_TreeWalker,
++    .vtbl            = &tree_walker_dispex_vtbl,
++    .disp_tid        = IWineDOMTreeWalker_tid,
++    .iface_tids      = TreeWalker_iface_tids,
++    .min_compat_mode = COMPAT_MODE_IE9,
++};
++
++HRESULT create_tree_walker(HTMLDocumentNode *doc, HTMLDOMNode *root, VARIANT *what_to_show, VARIANT *filter,
++                           VARIANT *expand, IWineDOMTreeWalker **p)
++{
++    struct tree_walker *ret;
++    VARIANT v;
++
++    if(!(ret = calloc(1, sizeof(*ret))))
++        return E_OUTOFMEMORY;
++
++    ret->what_to_show = SHOW_EVERYTHING;
++    V_VT(&v) = VT_EMPTY;
++    if(what_to_show && V_VT(what_to_show) != VT_EMPTY && V_VT(what_to_show) != VT_ERROR
++       && SUCCEEDED(VariantChangeType(&v, what_to_show, 0, VT_R8)))
++        ret->what_to_show = (ULONG)(LONGLONG)V_R8(&v);
++    if(filter && V_VT(filter) == VT_DISPATCH && V_DISPATCH(filter)) {
++        ret->filter = V_DISPATCH(filter);
++        IDispatch_AddRef(ret->filter);
++    }
++    if(expand && V_VT(expand) == VT_BOOL)
++        ret->expand = V_BOOL(expand);
++
++    ret->IWineDOMTreeWalker_iface.lpVtbl = &WineDOMTreeWalkerVtbl;
++    init_dispatch(&ret->dispex, &TreeWalker_dispex, doc->script_global,
++                  dispex_compat_mode(&doc->node.event_target.dispex));
++    IHTMLDOMNode_AddRef(&doc->node.IHTMLDOMNode_iface);
++    ret->doc = doc;
++    nsIDOMNode_AddRef(root->nsnode);
++    ret->root = root->nsnode;
++    nsIDOMNode_AddRef(root->nsnode);
++    ret->current = root->nsnode;
++
++    *p = &ret->IWineDOMTreeWalker_iface;
++    return S_OK;
++}
++
++struct node_filter {
++    DispatchEx dispex;
++    IWineDOMNodeFilter IWineDOMNodeFilter_iface;
++};
++
++static inline struct node_filter *impl_from_IWineDOMNodeFilter(IWineDOMNodeFilter *iface)
++{
++    return CONTAINING_RECORD(iface, struct node_filter, IWineDOMNodeFilter_iface);
++}
++
++DISPEX_IDISPATCH_IMPL(node_filter, IWineDOMNodeFilter, impl_from_IWineDOMNodeFilter(iface)->dispex)
++
++#define NODE_FILTER_CONST(name, value) \
++    static HRESULT WINAPI node_filter_get_##name(IWineDOMNodeFilter *iface, ULONG *p) \
++    { \
++        *p = value; \
++        return S_OK; \
++    }
++NODE_FILTER_CONST(FILTER_ACCEPT, FILTER_ACCEPT)
++NODE_FILTER_CONST(FILTER_REJECT, FILTER_REJECT)
++NODE_FILTER_CONST(FILTER_SKIP, FILTER_SKIP)
++NODE_FILTER_CONST(SHOW_ALL, 0xffffffff)
++NODE_FILTER_CONST(SHOW_ELEMENT, 0x1)
++NODE_FILTER_CONST(SHOW_ATTRIBUTE, 0x2)
++NODE_FILTER_CONST(SHOW_TEXT, 0x4)
++NODE_FILTER_CONST(SHOW_CDATA_SECTION, 0x8)
++NODE_FILTER_CONST(SHOW_ENTITY_REFERENCE, 0x10)
++NODE_FILTER_CONST(SHOW_ENTITY, 0x20)
++NODE_FILTER_CONST(SHOW_PROCESSING_INSTRUCTION, 0x40)
++NODE_FILTER_CONST(SHOW_COMMENT, 0x80)
++NODE_FILTER_CONST(SHOW_DOCUMENT, 0x100)
++NODE_FILTER_CONST(SHOW_DOCUMENT_TYPE, 0x200)
++NODE_FILTER_CONST(SHOW_DOCUMENT_FRAGMENT, 0x400)
++NODE_FILTER_CONST(SHOW_NOTATION, 0x800)
++
++static const IWineDOMNodeFilterVtbl WineDOMNodeFilterVtbl = {
++    node_filter_QueryInterface,
++    node_filter_AddRef,
++    node_filter_Release,
++    node_filter_GetTypeInfoCount,
++    node_filter_GetTypeInfo,
++    node_filter_GetIDsOfNames,
++    node_filter_Invoke,
++    node_filter_get_FILTER_ACCEPT,
++    node_filter_get_FILTER_REJECT,
++    node_filter_get_FILTER_SKIP,
++    node_filter_get_SHOW_ALL,
++    node_filter_get_SHOW_ELEMENT,
++    node_filter_get_SHOW_ATTRIBUTE,
++    node_filter_get_SHOW_TEXT,
++    node_filter_get_SHOW_CDATA_SECTION,
++    node_filter_get_SHOW_ENTITY_REFERENCE,
++    node_filter_get_SHOW_ENTITY,
++    node_filter_get_SHOW_PROCESSING_INSTRUCTION,
++    node_filter_get_SHOW_COMMENT,
++    node_filter_get_SHOW_DOCUMENT,
++    node_filter_get_SHOW_DOCUMENT_TYPE,
++    node_filter_get_SHOW_DOCUMENT_FRAGMENT,
++    node_filter_get_SHOW_NOTATION
++};
++
++static inline struct node_filter *node_filter_from_DispatchEx(DispatchEx *iface)
++{
++    return CONTAINING_RECORD(iface, struct node_filter, dispex);
++}
++
++static void *node_filter_query_interface(DispatchEx *dispex, REFIID riid)
++{
++    struct node_filter *This = node_filter_from_DispatchEx(dispex);
++
++    if(IsEqualGUID(&IID_IWineDOMNodeFilter, riid))
++        return &This->IWineDOMNodeFilter_iface;
++    return NULL;
++}
++
++static void node_filter_destructor(DispatchEx *dispex)
++{
++    free(node_filter_from_DispatchEx(dispex));
++}
++
++static const dispex_static_data_vtbl_t node_filter_dispex_vtbl = {
++    .query_interface  = node_filter_query_interface,
++    .destructor       = node_filter_destructor,
++};
++
++static const tid_t NodeFilter_iface_tids[] = {
++    IWineDOMNodeFilter_tid,
++    0
++};
++
++dispex_static_data_t NodeFilter_dispex = {
++    .id              = OBJID_NodeFilter,
++    .vtbl            = &node_filter_dispex_vtbl,
++    .disp_tid        = IWineDOMNodeFilter_tid,
++    .iface_tids      = NodeFilter_iface_tids,
++    /* window.NodeFilter is this object with its constants, not a generated constructor */
++    .min_compat_mode = COMPAT_MODE_IE9,
++    .max_compat_mode = COMPAT_MODE_IE8,
++};
++
++HRESULT create_node_filter(HTMLInnerWindow *window, IDispatch **p)
++{
++    struct node_filter *ret;
++
++    if(!(ret = calloc(1, sizeof(*ret))))
++        return E_OUTOFMEMORY;
++
++    ret->IWineDOMNodeFilter_iface.lpVtbl = &WineDOMNodeFilterVtbl;
++    init_dispatch(&ret->dispex, &NodeFilter_dispex, window, dispex_compat_mode(&window->event_target.dispex));
++
++    *p = (IDispatch*)&ret->IWineDOMNodeFilter_iface;
++    return S_OK;
++}
+--- a/dlls/mshtml/htmlwindow.c
++++ b/dlls/mshtml/htmlwindow.c
+@@ -3324,6 +3324,15 @@
+     return *encoded ? S_OK : E_OUTOFMEMORY;
+ }
+ 
++static HRESULT WINAPI window_private_get_NodeFilter(IWineHTMLWindowPrivate *iface, IDispatch **p)
++{
++    HTMLInnerWindow *This = impl_from_IWineHTMLWindowPrivateVtbl(iface)->inner_window;
++
++    TRACE("iface %p, p %p.\n", iface, p);
++
++    return create_node_filter(This, p);
++}
++
+ static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
+     window_private_QueryInterface,
+     window_private_AddRef,
+@@ -3339,6 +3348,7 @@
+     window_private_get_msCrypto,
+     window_private_atob,
+     window_private_btoa,
++    window_private_get_NodeFilter,
+ };
+ 
+ static inline HTMLWindow *impl_from_IWineHTMLWindowCompatPrivateVtbl(IWineHTMLWindowCompatPrivate *iface)
+--- a/dlls/mshtml/mshtml_private.h
++++ b/dlls/mshtml/mshtml_private.h
+@@ -309,7 +309,10 @@
+     XIID(ISVGTextContentElement)
+ 
+ #define PRIVATE_TID_LIST \
++    XIID(IWineDocumentTraversal) \
++    XIID(IWineDOMNodeFilter) \
+     XIID(IWineDOMTokenList) \
++    XIID(IWineDOMTreeWalker) \
+     XIID(IWineHTMLCharacterData) \
+     XIID(IWineHTMLChildNode) \
+     XIID(IWineHTMLDOMNodePrivate) \
+@@ -511,6 +514,7 @@
+     X(NamedNodeMap)                        \
+     X(Navigator)                           \
+     X(Node)                                \
++    X(NodeFilter)                          \
+     X(NodeList)                            \
+     X(Option)                              \
+     X(PageTransitionEvent)                 \
+@@ -534,6 +538,7 @@
+     X(SubtleCrypto)                        \
+     X(Text)                                \
+     X(TextRange)                           \
++    X(TreeWalker)                          \
+     X(UIEvent)                             \
+     X(Window)                              \
+     X(XDomainRequest)                      \
+@@ -1143,6 +1148,7 @@
+     IMarkupContainer             IMarkupContainer_iface;
+     IDisplayServices             IDisplayServices_iface;
+     IDocumentRange               IDocumentRange_iface;
++    IWineDocumentTraversal       IWineDocumentTraversal_iface;
+     IPersistMoniker              IPersistMoniker_iface;
+     IPersistFile                 IPersistFile_iface;
+     IMonikerProp                 IMonikerProp_iface;
+@@ -1456,6 +1462,8 @@
+ void HTMLElement_init_dispex_info(dispex_data_t*,compat_mode_t);
+ 
+ HRESULT get_node(nsIDOMNode*,BOOL,HTMLDOMNode**);
++HRESULT create_node_filter(HTMLInnerWindow*,IDispatch**);
++HRESULT create_tree_walker(HTMLDocumentNode*,HTMLDOMNode*,VARIANT*,VARIANT*,VARIANT*,IWineDOMTreeWalker**);
+ HTMLDOMNode *unsafe_node_from_IHTMLDOMNode(IHTMLDOMNode*);
+ void mutation_observer_char_data_set(nsIDOMNode*);
+ void start_pending_script_loads(HTMLInnerWindow*);
+--- a/dlls/mshtml/mshtml_private_iface.idl
++++ b/dlls/mshtml/mshtml_private_iface.idl
+@@ -192,6 +192,8 @@
+     HRESULT atob([in] BSTR encoded, [retval, out] BSTR *decoded);
+     [id(56)]
+     HRESULT btoa([in] BSTR str, [retval, out] BSTR *encoded);
++    [propget, id(57)]
++    HRESULT NodeFilter([retval, out] IDispatch **p);
+ }
+ 
+ [
+@@ -445,6 +447,101 @@
+ }
+ 
+ [
++    odl,
++    oleautomation,
++    dual,
++    hidden,
++    uuid(08ef0edd-5fb8-4178-a2f0-9f686e00441e)
++]
++interface IWineDOMTreeWalker : IDispatch
++{
++    [propget, id(1)]
++    HRESULT root([retval, out] IHTMLDOMNode **p);
++    [propget, id(2)]
++    HRESULT whatToShow([retval, out] ULONG *p);
++    [propget, id(3)]
++    HRESULT filter([retval, out] IDispatch **p);
++    [propget, id(4)]
++    HRESULT expandEntityReferences([retval, out] VARIANT_BOOL *p);
++    [propget, id(5)]
++    HRESULT currentNode([retval, out] IDispatch **p);
++    [propput, id(5)]
++    HRESULT currentNode([in] IDispatch *v);
++    [id(6)]
++    HRESULT parentNode([retval, out] IHTMLDOMNode **p);
++    [id(7)]
++    HRESULT firstChild([retval, out] IHTMLDOMNode **p);
++    [id(8)]
++    HRESULT lastChild([retval, out] IHTMLDOMNode **p);
++    [id(9)]
++    HRESULT previousSibling([retval, out] IHTMLDOMNode **p);
++    [id(10)]
++    HRESULT nextSibling([retval, out] IHTMLDOMNode **p);
++    [id(11)]
++    HRESULT previousNode([retval, out] IHTMLDOMNode **p);
++    [id(12)]
++    HRESULT nextNode([retval, out] IHTMLDOMNode **p);
++}
++
++[
++    odl,
++    oleautomation,
++    dual,
++    hidden,
++    uuid(08ef0edd-5fb8-4178-a2f0-9f686e00441f)
++]
++interface IWineDOMNodeFilter : IDispatch
++{
++    [propget, id(1)]
++    HRESULT FILTER_ACCEPT([retval, out] ULONG *p);
++    [propget, id(2)]
++    HRESULT FILTER_REJECT([retval, out] ULONG *p);
++    [propget, id(3)]
++    HRESULT FILTER_SKIP([retval, out] ULONG *p);
++    [propget, id(4)]
++    HRESULT SHOW_ALL([retval, out] ULONG *p);
++    [propget, id(5)]
++    HRESULT SHOW_ELEMENT([retval, out] ULONG *p);
++    [propget, id(6)]
++    HRESULT SHOW_ATTRIBUTE([retval, out] ULONG *p);
++    [propget, id(7)]
++    HRESULT SHOW_TEXT([retval, out] ULONG *p);
++    [propget, id(8)]
++    HRESULT SHOW_CDATA_SECTION([retval, out] ULONG *p);
++    [propget, id(9)]
++    HRESULT SHOW_ENTITY_REFERENCE([retval, out] ULONG *p);
++    [propget, id(10)]
++    HRESULT SHOW_ENTITY([retval, out] ULONG *p);
++    [propget, id(11)]
++    HRESULT SHOW_PROCESSING_INSTRUCTION([retval, out] ULONG *p);
++    [propget, id(12)]
++    HRESULT SHOW_COMMENT([retval, out] ULONG *p);
++    [propget, id(13)]
++    HRESULT SHOW_DOCUMENT([retval, out] ULONG *p);
++    [propget, id(14)]
++    HRESULT SHOW_DOCUMENT_TYPE([retval, out] ULONG *p);
++    [propget, id(15)]
++    HRESULT SHOW_DOCUMENT_FRAGMENT([retval, out] ULONG *p);
++    [propget, id(16)]
++    HRESULT SHOW_NOTATION([retval, out] ULONG *p);
++}
++
++[
++    odl,
++    oleautomation,
++    dual,
++    hidden,
++    uuid(08ef0edd-5fb8-4178-a2f0-9f686e004420)
++]
++interface IWineDocumentTraversal : IDispatch
++{
++    [id(1)]
++    HRESULT createTreeWalker([in] IHTMLDOMNode *root, [in, optional] VARIANT *whatToShow,
++                             [in, optional] VARIANT *filter, [in, optional] VARIANT *expandEntityReferences,
++                             [retval, out] IWineDOMTreeWalker **p);
++}
++
++[
+     odl,
+     oleautomation,
+     dual,
+--- a/dlls/mshtml/nsio.c
++++ b/dlls/mshtml/nsio.c
+@@ -3880,12 +3880,13 @@
+         const char *aOriginCharset, nsIURI *aBaseURI, nsIURI **_retval)
+ {
+     nsWineURI *wine_uri, *base_wine_uri = NULL;
+-    WCHAR new_spec[INTERNET_MAX_URL_LENGTH];
+     const char *spec = NULL;
+     UINT cp = CP_UTF8;
+     IUri *urlmon_uri;
++    WCHAR *new_spec;
+     nsresult nsres;
+     HRESULT hres;
++    int spec_len;
+ 
+     TRACE("(%s %s %p %p)\n", debugstr_nsacstr(aSpec), debugstr_a(aOriginCharset),
+           aBaseURI, _retval);
+@@ -3912,8 +3913,6 @@
+         SysFreeString(charset);
+     }
+ 
+-    MultiByteToWideChar(cp, 0, spec, -1, new_spec, ARRAY_SIZE(new_spec));
+-
+     if(aBaseURI) {
+         nsres = nsIURI_QueryInterface(aBaseURI, &IID_nsWineURI, (void**)&base_wine_uri);
+         if(NS_SUCCEEDED(nsres)) {
+@@ -3926,6 +3925,15 @@
+         }
+     }
+ 
++    /* a URL with a sign-in token can be longer than INTERNET_MAX_URL_LENGTH */
++    spec_len = MultiByteToWideChar(cp, 0, spec, -1, NULL, 0);
++    if(!(new_spec = malloc(spec_len * sizeof(WCHAR)))) {
++        if(base_wine_uri)
++            nsIFileURL_Release(&base_wine_uri->nsIFileURL_iface);
++        return NS_ERROR_OUT_OF_MEMORY;
++    }
++    MultiByteToWideChar(cp, 0, spec, -1, new_spec, spec_len);
++
+     if(base_wine_uri) {
+         hres = combine_url(base_wine_uri->uri, new_spec, &urlmon_uri);
+         nsIFileURL_Release(&base_wine_uri->nsIFileURL_iface);
+@@ -3934,6 +3942,7 @@
+         if(FAILED(hres))
+             WARN("create_uri failed: %08lx\n", hres);
+     }
++    free(new_spec);
+ 
+     if(FAILED(hres))
+         return NS_SUCCESS_DEFAULT_ACTION;

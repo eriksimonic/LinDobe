@@ -1,0 +1,155 @@
+From: AdobeWine
+Subject: [PATCH] jscript: encode and decode surrogate pairs in the URI functions.
+
+encodeURI and encodeURIComponent converted one UTF-16 unit at a time, so every character outside the BMP (an emoji)
+threw "URI to be encoded contains invalid characters". decodeURI had room for one unit, so it failed on the four byte
+form. A lone surrogate still throws, as the standard asks.
+Test: wine/tests/treewalker/tw.html: U+1F600 gives %F0%9F%98%80 and back.
+
+---
+--- a/dlls/jscript/global.c
++++ b/dlls/jscript/global.c
+@@ -557,12 +557,18 @@
+     return gc_run(ctx);
+ }
+ 
++/* a surrogate pair is one character; a lone surrogate is left for the conversion to reject */
++static inline unsigned uri_char_units(const WCHAR *ptr)
++{
++    return IS_HIGH_SURROGATE(ptr[0]) && IS_LOW_SURROGATE(ptr[1]) ? 2 : 1;
++}
++
+ static HRESULT JSGlobal_encodeURI(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
+         jsval_t *r)
+ {
+     const WCHAR *ptr, *uri;
+     jsstr_t *str, *ret;
+-    DWORD len = 0, i;
++    DWORD len = 0, i, chars;
+     char buf[4];
+     WCHAR *rptr;
+     HRESULT hres;
+@@ -583,13 +589,15 @@
+         if(is_uri_unescaped(*ptr) || is_uri_reserved(*ptr) || *ptr == '#') {
+             len++;
+         }else {
+-            i = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ptr, 1, NULL, 0, NULL, NULL)*3;
++            chars = uri_char_units(ptr);
++            i = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ptr, chars, NULL, 0, NULL, NULL)*3;
+             if(!i) {
+                 jsstr_release(str);
+                 return JS_E_INVALID_URI_CHAR;
+             }
+ 
+             len += i;
++            ptr += chars - 1;
+         }
+     }
+ 
+@@ -603,12 +611,14 @@
+         if(is_uri_unescaped(*ptr) || is_uri_reserved(*ptr) || *ptr == '#') {
+             *rptr++ = *ptr;
+         }else {
+-            len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ptr, 1, buf, sizeof(buf), NULL, NULL);
++            chars = uri_char_units(ptr);
++            len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ptr, chars, buf, sizeof(buf), NULL, NULL);
+             for(i=0; i<len; i++) {
+                 *rptr++ = '%';
+                 *rptr++ = int_to_char((BYTE)buf[i] >> 4);
+                 *rptr++ = int_to_char(buf[i] & 0x0f);
+             }
++            ptr += chars - 1;
+         }
+     }
+ 
+@@ -631,7 +641,7 @@
+     int i, val, res;
+     WCHAR *ret;
+     char buf[4];
+-    WCHAR out;
++    WCHAR out[2];
+     HRESULT hres;
+ 
+     TRACE("\n");
+@@ -657,7 +667,7 @@
+                 val += hex_to_int(ptr[i*3+1])<<4;
+                 buf[i] = val;
+ 
+-                res = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, buf, i+1, &out, 1);
++                res = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, buf, i+1, out, ARRAY_SIZE(out));
+                 if(res)
+                     break;
+             }
+@@ -668,7 +678,7 @@
+             }
+ 
+             ptr += i*3+2;
+-            len++;
++            len += res;
+         }
+     }
+ 
+@@ -682,19 +692,20 @@
+         if(*ptr != '%') {
+             *ret++ = *ptr;
+         }else {
++            res = 0;
+             for(i=0; i<4; i++) {
+                 if(ptr[i*3]!='%' || hex_to_int(ptr[i*3+1])==-1 || (val=hex_to_int(ptr[i*3+2]))==-1)
+                     break;
+                 val += hex_to_int(ptr[i*3+1])<<4;
+                 buf[i] = val;
+ 
+-                res = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, buf, i+1, ret, 1);
++                res = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, buf, i+1, ret, 2);
+                 if(res)
+                     break;
+             }
+ 
+             ptr += i*3+2;
+-            ret++;
++            ret += res;
+         }
+     }
+ 
+@@ -714,7 +725,7 @@
+     jsstr_t *str, *ret_str;
+     char buf[4];
+     const WCHAR *ptr, *uri;
+-    DWORD len = 0, size, i;
++    DWORD len = 0, size, i, chars;
+     WCHAR *ret;
+     HRESULT hres;
+ 
+@@ -734,12 +745,14 @@
+         if(is_uri_unescaped(*ptr))
+             len++;
+         else {
+-            size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ptr, 1, NULL, 0, NULL, NULL);
++            chars = uri_char_units(ptr);
++            size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ptr, chars, NULL, 0, NULL, NULL);
+             if(!size) {
+                 jsstr_release(str);
+                 return JS_E_INVALID_URI_CHAR;
+             }
+             len += size*3;
++            ptr += chars - 1;
+         }
+     }
+ 
+@@ -753,12 +766,14 @@
+         if(is_uri_unescaped(*ptr)) {
+             *ret++ = *ptr;
+         }else {
+-            size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ptr, 1, buf, sizeof(buf), NULL, NULL);
++            chars = uri_char_units(ptr);
++            size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ptr, chars, buf, sizeof(buf), NULL, NULL);
+             for(i=0; i<size; i++) {
+                 *ret++ = '%';
+                 *ret++ = int_to_char((BYTE)buf[i] >> 4);
+                 *ret++ = int_to_char(buf[i] & 0x0f);
+             }
++            ptr += chars - 1;
+         }
+     }
+ 

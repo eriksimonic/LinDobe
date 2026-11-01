@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.3 - 2026-11-01
+
+- **Adobe's "too many devices" page now draws.** It was blank, which left you stuck when Adobe asked you to sign out of
+  a device. Wine's browser engine lacked `createTreeWalker` and `NodeFilter` (0105), and cut long sign-in URLs at 2084
+  characters and read stray memory after them (0105). The X on the window closes the app. The page's "Quit" button
+  does nothing yet.
+- Emoji and other characters outside the basic Unicode range no longer make `encodeURIComponent` fail in Wine's
+  script engine (0106).
+
 ## 0.5.2 - 2026-10-31
 
 - **Flatpak: apps that need Microsoft's Visual C++ runtime now start.** The Flatpak's space-saving links made

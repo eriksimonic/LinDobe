@@ -15,7 +15,7 @@ First steps for any problem:
 | `no AdobeWine runtime` | Install the `adobewine-bin`/`adobewine` package, or run `scripts/build-wine.sh` |
 | The Creative Cloud installer stays on "Loading..." | `adobewine setup` installs wine-gecko; run it again and check its output |
 | The sign-in window is blank or white | Close it, `adobewine fix-signin`, then `adobewine cc` |
-| An app opens a blank window at first start | Adobe may be asking you to sign out another device, and that page can't draw here. Sign out of a device you don't use at [account.adobe.com](https://account.adobe.com), then start the app again |
+| Adobe says you have too many devices | Since 0.5.3 the page draws. Choose a device to sign out of there, or do it at [account.adobe.com](https://account.adobe.com). The page's Quit button does nothing yet: close it with the X on the window |
 | The Adobe installer stays on "Loading..." | It waited too long at sign-in. Close it, open AdobeWine again and sign in straight away |
 | The small Creative Cloud web installer (about 3 MB) shows only a white window | Fixed for build 2.14.0.82 (found by NickPittas, [#2](../../../issues/2)): patches 0055-0057 (AdobeWine 0.2.0 and later). If it still stays white, use Adobe's Creative Cloud **offline installer** (search Adobe Help for "Creative Cloud offline installer") and run it with `adobewine run`. Only use installers from adobe.com |
 | Creative Cloud's Apps tab stays on its placeholder the first time | Click Home, then Apps again |

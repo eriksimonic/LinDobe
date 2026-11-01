@@ -107,3 +107,5 @@ to WineHQ; help with that is very welcome.
 | 0102 | various | Stubs from subsystems Wine lacks return an error instead of aborting the process. The subsystems still do not work |
 | 0103 | crypt32, wintrust | Two signature-check bugs: Acrobat crashed at start, acrotray and AdobeCollabSync aborted |
 | 0104 | winex11 | Photoshop's contextual task bar stays with Photoshop instead of above every other app |
+| 0105 | mshtml | `document.createTreeWalker`, `NodeFilter`, URLs longer than 2084 characters. Adobe's too-many-devices page draws |
+| 0106 | jscript | The URI functions handle emoji and other surrogate pairs |
