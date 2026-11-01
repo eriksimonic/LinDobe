@@ -1,12 +1,12 @@
 # Reports: crashes, problems and feedback
 
-AdobeWine can send structured reports to the project's
+LinDobe can send structured reports to the project's
 [issue tracker](../../../issues?q=label%3Areport) so that problems on hardware we do not
 have can be debugged. **Reports are opt-in and you see each one before it is sent.**
 
 ## What a report contains
 
-- AdobeWine and Wine versions, the downloaded translation layers (DXVK, vkd3d-proton,
+- LinDobe and Wine versions, the downloaded translation layers (DXVK, vkd3d-proton,
   nvidia-libs) and the names of the Adobe apps installed in your prefix;
 - distribution, kernel, desktop and session type (Wayland/X11);
 - CPU model, amount of RAM, GPU models, NVIDIA driver and Mesa versions, Vulkan devices;
@@ -46,4 +46,4 @@ REPORTS=off    # never offer or send reports
 ```
 
 There is no anonymous upload: reports go through your own GitHub account, so nothing is
-sent by a hidden service and no write token is shipped inside AdobeWine.
+sent by a hidden service and no write token is shipped inside LinDobe.

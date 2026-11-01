@@ -1,17 +1,17 @@
-# Installing AdobeWine on Gentoo
+# Installing LinDobe on Gentoo
 
-Gentoo packages for AdobeWine are in the `::snakebyte` overlay
+Gentoo packages for LinDobe are in the `::snakebyte` overlay
 (<https://github.com/switch87/snakebyte-overlay>), maintained outside this project by
 Gert Pellin. Portage builds the patched Wine and installs DXVK, vkd3d-proton, wine-gecko
 and wine-mono itself, so `adobewine setup` downloads nothing but what winetricks fetches.
 
 | Package | What it does |
 |---|---|
-| `app-emulation/wine-adobe` | Wine 11.20 with the AdobeWine patches, in `/usr/lib/wine-adobe-11.20` (slotted next to other Wine versions) |
+| `app-emulation/wine-adobe` | Wine 11.20 with the LinDobe patches, in `/usr/lib/wine-adobe-11.20` (slotted next to other Wine versions) |
 | `app-emulation/adobewine` | the `adobewine` command and scripts in `/opt/adobewine`, DXVK, vkd3d-proton, the D3D12 shim |
 | `media-fonts/selawik` | Microsoft's open Segoe UI fallback, used when you have no Windows fonts |
 
-The overlay may carry fixes that are not in an AdobeWine release yet; its README lists
+The overlay may carry fixes that are not in a LinDobe release yet; its README lists
 them.
 
 ## 1. Add the overlay

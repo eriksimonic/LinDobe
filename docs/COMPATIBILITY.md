@@ -1,6 +1,6 @@
 # Compatibility review
 
-What AdobeWine needs from the system, what has been tested, and what is expected to work
+What LinDobe needs from the system, what has been tested, and what is expected to work
 on other Linux distributions and Unix-like systems. "Tested" means checked on real
 hardware; everything else is reasoned from the dependencies and **needs reports from
 users**: please open a [compatibility report](../../../issues/new?template=compatibility.yml).
@@ -50,7 +50,7 @@ H.264/HEVC) work through nvidia-libs.
 | AMD RDNA 1-4 (RADV) | Photoshop works (RX 7900 XTX, #15); Premiere: quit after the splash, fix in patch 0085 awaiting confirmation on AMD | no CUDA: Premiere falls back to software rendering or OpenCL; no AMF hardware encoding through Wine |
 | AMD GCN 3-5 (RADV) | untested | |
 | Intel Arc / Xe (ANV) | untested | Iris Xe tested only as display GPU; no Quick Sync through Wine |
-| Hybrid Intel/AMD + NVIDIA | **works (tested)** | AdobeWine enables PRIME offload automatically |
+| Hybrid Intel/AMD + NVIDIA | **works (tested)** | LinDobe enables PRIME offload automatically |
 
 ## Community reports
 

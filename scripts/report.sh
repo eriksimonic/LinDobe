@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# AdobeWine problem/usage report.
+# LinDobe problem/usage report.
 #   adobewine report [--app NAME] [--log FILE] [--note TEXT] [--auto] [--save-only]
 # Without --note it asks you what you were doing.
 #
-# Collects the hardware, drivers, distribution, AdobeWine and Adobe app versions, what was
+# Collects the hardware, drivers, distribution, LinDobe and Adobe app versions, what was
 # run, and the end of that run's log. Personal data is removed (user and host names, home
 # paths, e-mail and IP addresses, anything that looks like a token), and you see the
 # report before anything is sent. Nothing is ever sent without either your "yes" or
 # REPORTS=auto in ~/.config/adobewine/config.
 #
 # Sending: with the GitHub CLI logged in (`gh auth login`), the report becomes an issue
-# labelled "report" in the AdobeWine repository. Without it, your browser opens a
+# labelled "report" in the LinDobe repository. Without it, your browser opens a
 # pre-filled issue page for you to submit. Reports are always saved in
 # ~/.local/share/adobewine/reports/ as well.
 set -uo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/bin/env.sh"
 CONF="${XDG_CONFIG_HOME:-$HOME/.config}/adobewine/config"
 [ -f "$CONF" ] && source "$CONF"
-REPO="${ADOBEWINE_REPO:-le-birnes/AdobeWine}"
+REPO="${ADOBEWINE_REPO:-le-birnes/LinDobe}"
 REPORTS="${REPORTS:-ask}"
 
 APP="" LOG="" NOTE="" AUTO=0 SAVE_ONLY=0 EXIT_CODE="" DURATION=""
@@ -76,7 +76,7 @@ TS="$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$ADOBEWINE_HOME/reports"
 OUT="$ADOBEWINE_HOME/reports/report-$TS.md"
 {
-  echo "### AdobeWine report"
+  echo "### LinDobe report"
   echo
   echo "| | |"
   echo "|---|---|"
@@ -84,7 +84,7 @@ OUT="$ADOBEWINE_HOME/reports/report-$TS.md"
   [ -n "$EXIT_CODE" ] && echo "| Exit code | $EXIT_CODE |"
   [ -n "$DURATION" ] && echo "| Ran for | ${DURATION}s |"
   echo "| Crash detected | $([ -n "$crash" ] && echo yes || echo no) |"
-  echo "| AdobeWine | $aw_ver ($wine_ver) |"
+  echo "| LinDobe | $aw_ver ($wine_ver) |"
   echo "| Translation layers | ${deps:-not downloaded} |"
   echo "| Adobe apps in prefix | ${apps:-none} |"
   echo "| Distribution | $os |"

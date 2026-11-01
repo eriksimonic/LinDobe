@@ -16,9 +16,11 @@ address scan, imports, exports, near jumps and calls, and resource directories a
 the first window of a large old file is the dictionary, and the decoder takes the window size from the caller.
 NormalizeFileForPatchSignature is implemented. The PE work is in the new file pe.c.
 
-Written clean-room from a behaviour specification (docs/ref/pa19-spec.md); checked black-box against Windows'
-mspatcha.dll output. Where the specification was unclear or wrong, the Windows DLL's results decided (see
-docs/ref/pa19-cleanroom.md). The file and handle interfaces treat a normalized already-patched file like an exact
+Rewritten from a behaviour specification; checked black-box against Windows' mspatcha.dll output. Where the
+specification was unclear or wrong, the Windows DLL's results decided. The specification came from a study of Windows'
+mspatcha.dll that included decompiling it, and the first version of this code was based on that study. A separate
+session of the same AI tool wrote this version without access to the decompile or the first version. That is not a
+clean-room process, and it is not independent proof that no Microsoft code carried over. The file and handle interfaces treat a normalized already-patched file like an exact
 one under APPLY_OPTION_FAIL_IF_EXACT and ignore APPLY_OPTION_FAIL_IF_CLOSE there. A malformed lock-prefix table
 ends normalization (no checksum; NormalizeFileForPatchSignature returns 0). A HIGHADJ relocation that ends a block
 keeps the rebase reading entries up to the end of the file.

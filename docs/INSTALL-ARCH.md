@@ -1,4 +1,4 @@
-# Installing AdobeWine on Arch Linux
+# Installing LinDobe on Arch Linux
 
 Detailed procedure for Arch Linux and Arch-based distributions (CachyOS, EndeavourOS,
 Manjaro, Garuda, ArcoLinux). This is the tested route: the reference machine runs CachyOS
@@ -19,7 +19,7 @@ in the package.
 
 ### 1.1 GPU driver and Vulkan
 
-AdobeWine renders through Vulkan (DXVK, vkd3d-proton), so a working Vulkan driver is
+LinDobe renders through Vulkan (DXVK, vkd3d-proton), so a working Vulkan driver is
 required:
 
 | GPU | Packages |
@@ -30,13 +30,13 @@ required:
 
 Check it with `vulkaninfo --summary` (package `vulkan-tools`): your GPU must be listed.
 
-On **hybrid laptops** (Intel or AMD integrated GPU + NVIDIA), AdobeWine detects the
+On **hybrid laptops** (Intel or AMD integrated GPU + NVIDIA), LinDobe detects the
 NVIDIA driver and renders on the NVIDIA GPU (PRIME render offload). To force or disable
 that, set `ADOBEWINE_NVIDIA_OFFLOAD=1` or `=0`.
 
 ### 1.2 Only the runtime dependencies
 
-To install everything AdobeWine needs to *run*, without installing AdobeWine itself (for
+To install everything LinDobe needs to *run*, without installing LinDobe itself (for
 example to prepare a machine, or to use a self-built runtime):
 
 ```sh
@@ -62,20 +62,20 @@ sudo pacman -S --needed base-devel git ccache mingw-w64-gcc ffmpeg libcups libgp
 `yay -S adobewine` installs these by itself while building, and `makepkg -so` in a
 checkout of the AUR package installs them without building anything.
 
-## 2. Install AdobeWine
+## 2. Install LinDobe
 
 > **AUR registration pending.** Until `adobewine` / `adobewine-bin` appear on the AUR, install the ready-made
-> package from the [release](https://github.com/le-birnes/AdobeWine/releases). pacman fetches the dependencies:
+> package from the [release](https://github.com/le-birnes/LinDobe/releases). pacman fetches the dependencies:
 >
 > ```sh
-> sudo pacman -U https://github.com/le-birnes/AdobeWine/releases/download/v0.5.4/adobewine-0.5.4-1-x86_64.pkg.tar.zst
+> sudo pacman -U https://github.com/le-birnes/LinDobe/releases/download/v0.5.4/adobewine-0.5.4-1-x86_64.pkg.tar.zst
 > ```
 >
 > Or build it from this repository:
 >
 > ```sh
-> git clone https://github.com/le-birnes/AdobeWine.git
-> cd AdobeWine/packaging/aur/adobewine && makepkg -si
+> git clone https://github.com/le-birnes/LinDobe.git
+> cd LinDobe/packaging/aur/adobewine && makepkg -si
 > ```
 
 Once on the AUR, with an AUR helper (`yay` or `paru`):
@@ -138,7 +138,7 @@ Logs go to `~/.local/share/adobewine/logs/`. `adobewine off` closes everything c
   (install `xorg-xwayland`, normally already present).
 - **GNOME, Xfce, Hyprland, Sway**: untested; they should work through XWayland. Please
   report.
-- AdobeWine turns off window-manager decorations for Wine windows, because Adobe apps
+- LinDobe turns off window-manager decorations for Wine windows, because Adobe apps
   draw their own title bar. Use the app's own buttons or `Alt+F4` to close.
 
 ## 6. Updating and removing
@@ -164,5 +164,5 @@ rm -rf ~/.local/share/adobewine   # your prefix and the Adobe apps in it
 - **ntsync**: Wine 11 uses `/dev/ntsync` when the kernel module is loaded
   (`sudo modprobe ntsync`; Arch's `ntsync-autoload` package loads it at boot). It is
   optional.
-- **Multilib is not needed**: AdobeWine is built in Wine's new WoW64 mode, so 32-bit parts
+- **Multilib is not needed**: LinDobe is built in Wine's new WoW64 mode, so 32-bit parts
   run without 32-bit Linux libraries.

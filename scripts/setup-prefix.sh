@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create or refresh the AdobeWine prefix. Safe to run again.
+# Create or refresh the LinDobe prefix. Safe to run again.
 # Usage: scripts/setup-prefix.sh [--windows-fonts DIR] [--dpi N]
 #   --windows-fonts DIR   copy fonts from your own Windows installation (its C:\Windows\Fonts
 #                         folder, e.g. a mounted Windows partition). Strongly recommended:
@@ -18,7 +18,7 @@ while [ $# -gt 0 ]; do
     *) echo "unknown option $1" >&2; exit 1 ;;
   esac
 done
-[ -x "$ADOBEWINE_RUNTIME/bin/wine" ] || { echo "no AdobeWine runtime: install the adobewine package or run scripts/build-wine.sh" >&2; exit 1; }
+[ -x "$ADOBEWINE_RUNTIME/bin/wine" ] || { echo "no LinDobe runtime: install the adobewine package or run scripts/build-wine.sh" >&2; exit 1; }
 for t in winetricks cabextract; do command -v $t >/dev/null || { echo "$t is required (install it from your distribution)" >&2; exit 1; }; done
 DEPS="$ADOBEWINE_HOME/deps"
 ls -d "$DEPS"/dxvk-*/ >/dev/null 2>&1 || "$ADOBEWINE_SRC/scripts/fetch-deps.sh"

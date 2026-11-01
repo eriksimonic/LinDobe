@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build AdobeWine: upstream Wine 11.20 + the patches in patches/, installed into
+# Build LinDobe: upstream Wine 11.20 + the patches in patches/, installed into
 # $ADOBEWINE_HOME/runtime. Usage: scripts/build-wine.sh [jobs]
 set -euo pipefail
 source "$(cd "$(dirname "$0")/.." && pwd)/bin/env.sh"

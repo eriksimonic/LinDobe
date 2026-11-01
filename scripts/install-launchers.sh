@@ -42,8 +42,8 @@ entry() {  # entry <name> <title> <categories> <mime> <wmclass> <exe>
   cat > "$APPS/adobewine-$1.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=$2 (AdobeWine)
-Comment=$2 through the AdobeWine Wine build
+Name=$2 (LinDobe)
+Comment=$2 through the LinDobe Wine build
 Exec=$EXEC $1 %F
 Icon=adobewine-$1
 Terminal=false
@@ -68,7 +68,7 @@ entry cc "Adobe Creative Cloud" "Graphics;" "" "creative cloud.exe" "$PF/Adobe C
 cat > "$APPS/adobewine-off.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Stop all Adobe apps (AdobeWine)
+Name=Stop all Adobe apps (LinDobe)
 Exec=$EXEC off
 Icon=process-stop
 Terminal=false

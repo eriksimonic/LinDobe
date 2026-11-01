@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# AdobeWine launcher.
+# LinDobe launcher.
 #   adobewine setup [--windows-fonts DIR] [--dpi N]  create or refresh the Wine prefix (run once)
 #   adobewine photoshop|illustrator|premiere|audition|encoder|aftereffects|indesign|
 #             bridge|lightroomclassic|lightroom|acrobat|cc [files...]
-#   adobewine run <program.exe> [args...]     run any Windows program in the AdobeWine prefix
+#   adobewine run <program.exe> [args...]     run any Windows program in the LinDobe prefix
 #   adobewine off [--force]                   close the Adobe apps like their close button, then stop Wine
 #   adobewine fix-signin                      use the built-in browser for Adobe sign-in (see docs)
 #   adobewine launchers [--remove]            add the installed apps to the desktop menu
@@ -56,7 +56,7 @@ case "$cmd" in
         echo "An Adobe app is still open (maybe asking to save). Close it, or run: adobewine off --force"; exit 1
       fi
     fi
-    wineserver -k; echo "All AdobeWine processes stopped."; exit 0 ;;
+    wineserver -k; echo "All LinDobe processes stopped."; exit 0 ;;
   fix-signin)
     # Adobe's licensing window comes in two flavours; the Chromium one does not draw under
     # Wine, the Internet Explorer engine one does. Renaming the Chromium helper makes Adobe's
@@ -128,7 +128,7 @@ if [ "$REPORTS" != off ] && grep -qE 'Unhandled exception|Unhandled page fault|p
   if [ "$REPORTS" = auto ]; then "${r[@]}" --auto >/dev/null 2>&1
   elif [ -t 0 ]; then echo "$cmd crashed."; "${r[@]}"
   else "${r[@]}" --save-only >/dev/null 2>&1
-       command -v notify-send >/dev/null && notify-send -i dialog-warning "AdobeWine: $cmd crashed" \
+       command -v notify-send >/dev/null && notify-send -i dialog-warning "LinDobe: $cmd crashed" \
          "A report was saved. Run 'adobewine report' in a terminal to review and send it."
   fi
 fi

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""AdobeWine: the window people see. It wraps bin/adobewine and scripts/, which stay the only place where
+"""LinDobe: the window people see. It wraps bin/adobewine and scripts/, which stay the only place where
 things are done, so the terminal route and this window always do the same:
   1. check   the computer can run the apps (Vulkan GPU, disk space)
   2. prepare `adobewine setup` (fonts from a Windows partition when one is mounted)
   3. Creative Cloud: Adobe's current installer, downloaded from Adobe at that moment, then sign-in
   4. apps    open, close all, menu entries, report a problem
-After an AdobeWine update the prefix is refreshed once (setup can safely run again)."""
+After a LinDobe update the prefix is refreshed once (setup can safely run again)."""
 import ctypes, glob, os, platform, re, shutil, subprocess, sys, threading, urllib.parse
 import gi
 gi.require_version('Gtk', '4.0'); gi.require_version('Adw', '1')
@@ -19,7 +19,7 @@ PREFIX = os.environ.get('WINEPREFIX') or os.path.join(HOME, 'prefix')
 PF = os.path.join(PREFIX, 'drive_c', 'Program Files', 'Adobe')
 VERSION = open(os.path.join(SRC, 'VERSION')).read().strip()
 STAMP = os.path.join(HOME, 'setup-version')
-REPO = os.environ.get('ADOBEWINE_REPO', 'le-birnes/AdobeWine')
+REPO = os.environ.get('ADOBEWINE_REPO', 'le-birnes/LinDobe')
 CC_URL = ('https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-external/core/v1/wam/download'
           '?sapCode=KCCC&productName=Creative%20Cloud&os=win')
 NEED_GB = 25
@@ -86,7 +86,7 @@ def windows_fonts():
 
 class Hub(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title='AdobeWine', default_width=560, default_height=640)
+        super().__init__(application=app, title='LinDobe', default_width=560, default_height=640)
         self.toasts = Adw.ToastOverlay()
         tv = Adw.ToolbarView(); tv.add_top_bar(Adw.HeaderBar()); tv.set_content(self.toasts)
         self.set_content(tv)
@@ -142,12 +142,12 @@ class Hub(Adw.ApplicationWindow):
             lines.append(f'Free disk space: {free:.0f} GB')
         f = windows_fonts()
         lines.append('Windows fonts: found on your Windows partition, they will be used' if f else
-                     'Windows fonts: none found; AdobeWine brings a stand-in for the Segoe UI font')
-        lines.append('You need an Adobe Creative Cloud subscription. AdobeWine contains no Adobe software: '
+                     'Windows fonts: none found; LinDobe brings a stand-in for the Segoe UI font')
+        lines.append('You need an Adobe Creative Cloud subscription. LinDobe contains no Adobe software: '
                      "Creative Cloud is downloaded from Adobe, and you sign in with your own account.")
         lbl = Gtk.Label(label='\n\n'.join(lines), wrap=True, xalign=0)
         self.page('check', 'emblem-ok-symbolic' if ok else 'dialog-warning-symbolic',
-                  'Welcome to AdobeWine' if ok else 'This computer needs something first',
+                  'Welcome to LinDobe' if ok else 'This computer needs something first',
                   'Adobe Creative Cloud apps on Linux. Setting up takes 10-20 minutes and needs no terminal.'
                   + (' Starting…' if ok and self.auto else ''),
                   lbl, self.button('Set up', lambda: self.prepare()) if ok else
@@ -159,7 +159,7 @@ class Hub(Adw.ApplicationWindow):
         bar = Gtk.ProgressBar(show_text=True, text='Starting')
         log = Gtk.TextView(editable=False, monospace=True, wrap_mode=Gtk.WrapMode.CHAR, height_request=200)
         exp = Gtk.Expander(label='Details', child=Gtk.ScrolledWindow(child=log, min_content_height=200))
-        self.page('prepare', 'folder-download-symbolic', 'Updating AdobeWine' if update else 'Preparing',
+        self.page('prepare', 'folder-download-symbolic', 'Updating LinDobe' if update else 'Preparing',
                   'Your apps and files stay as they are.' if update else
                   'Downloading the graphics layers and setting up a Windows environment for the Adobe apps.',
                   bar, exp)
@@ -199,7 +199,7 @@ class Hub(Adw.ApplicationWindow):
     def cc_page(self):
         bar = Gtk.ProgressBar(show_text=True, visible=False)
         st = self.page('cc', 'system-users-symbolic', 'Creative Cloud',
-                       "AdobeWine downloads Adobe's current Creative Cloud installer from adobe.com and starts it. "
+                       "LinDobe downloads Adobe's current Creative Cloud installer from adobe.com and starts it. "
                        'Sign in with your Adobe account when it asks.', bar)
         box = st.get_parent()
         go = self.button('Download and install Creative Cloud', lambda: self.install_cc(bar, go))
@@ -285,7 +285,7 @@ class Hub(Adw.ApplicationWindow):
             r = Adw.ActionRow(title=title, subtitle=sub, activatable=True)
             r.add_suffix(Gtk.Image(icon_name='go-next-symbolic')); r.connect('activated', lambda _r, c=cb: c())
             more.add(r)
-        self.page('apps', 'applications-graphics-symbolic', 'AdobeWine',
+        self.page('apps', 'applications-graphics-symbolic', 'LinDobe',
                   None if apps else 'No Adobe app is installed yet: open Creative Cloud and install one from its Apps page.',
                   grp, more)
         if not getattr(self, 'watch', None):                         # apps installed in Creative Cloud show up here

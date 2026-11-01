@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# AdobeWine environment. Source this file; it never touches a system-wide Wine.
+# LinDobe environment. Source this file; it never touches a system-wide Wine.
 #   ADOBEWINE_HOME   where the runtime, dependencies and prefix live
 #                    (default: ${XDG_DATA_HOME:-~/.local/share}/adobewine)
 #   WINEPREFIX       the Windows prefix (default: $ADOBEWINE_HOME/prefix)

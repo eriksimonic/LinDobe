@@ -4,7 +4,7 @@ Which Windows functions Adobe's software calls, and what Wine 11.20 with these p
 
 **Scanned 2026-10-31:** 5664 binaries from 13 install groups (Acrobat, After Effects, Audition, Bridge, Common, Creative Cloud, Illustrator, InDesign, Lightroom, Lightroom Classic, Media Encoder, Photoshop, Premiere Pro), importing from 894 DLL names. 138 of those are DLLs Wine provides, with 6677 distinct functions imported from them. The other names are Adobe's own DLLs, or third-party ones.
 
-**What this map proves, and what it doesn't.** It checks that a function exists and doesn't abort. It says nothing about whether every function behaves like Windows. Behaviour is covered by app test suites, by `tests/gapmap` for the functions below, and, where Windows behaviour had to be worked out, by the clean-room method in `patches/0097`: a behaviour description checked against Windows, no Microsoft code copied.
+**What this map proves, and what it doesn't.** It checks that a function exists and doesn't abort. It says nothing about whether every function behaves like Windows. Behaviour is covered by app test suites, by `tests/gapmap` for the functions below, and, where Windows behaviour had to be worked out, as described in `patches/0097`: a written behaviour description checked against Windows' output. How that description was made is in the patch notes.
 
 ## Gaps found: 174
 

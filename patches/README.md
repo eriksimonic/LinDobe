@@ -1,4 +1,4 @@
-# AdobeWine patches for wine-11.20
+# LinDobe patches for wine-11.20
 
 The full current patch set (wine/patches 0001-0091 with split parts, parked 0059 excluded), rebased onto
 wine-11.20 (tag `wine-11.20`) on 2026-10-28: 89 files. Complete on its own: apply every `*.patch` here in name
@@ -41,8 +41,8 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
 - 0097 (2026-10-30): new (mspatcha: 32-bit PE normalization and the rift-table transform, the full PA19 header,
   old files larger than the LZX window, and old files that already are the new file; Acrobat's 3544 deltas apply
   byte-identical to Windows' mspatcha.dll except 10 that Windows also rejects). 2026-10-31: replaced by a
-  clean-room rewrite from a behaviour specification (docs/ref/pa19-spec.md, docs/ref/pa19-cleanroom.md), written
-  by an implementer who never saw the decompiled code or the first version; same results.
+  rewrite from a behaviour specification, by a separate session of the same AI tool without access to the decompiled
+  code or the first version; same results. This is not a clean-room process: see the patch description.
 - 0098 (2026-10-30): new (msi: the deltas and added files of a patch are looked up on the media the patch added;
   Acrobat's update left 274 files, Acrobat.dll among them, at the 2021 base and thorvg-1.dll missing).
 - 0099 (2026-10-31): new (server: a pipe end opened or created under a restricted token is credited to the process

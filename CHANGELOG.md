@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **AdobeWine is now LinDobe**, an Adobe adapter for Wine on Linux. It's an independent project, not made by or
+  affiliated with Adobe. The repository moved to `le-birnes/LinDobe`, and old links redirect. The `adobewine` command,
+  package names, Flatpak ID and data folders stay as they are for now, so existing installs and the 0.5.4 steps keep
+  working.
+- Patch 0097's notes no longer call it clean-room. They now describe how it was made, including that its specification
+  came from a study that decompiled Windows' mspatcha.dll.
+
 ## 0.5.4 - 2026-11-01
 
 - **The Flatpak no longer looks like a different computer to Adobe.** Wine read the machine ID from a file Flatpak
@@ -44,7 +53,7 @@
 - A failed install no longer breaks the other apps: when Acrobat's installer failed, Wine's rollback deleted the
   Microsoft Visual C++ runtime that every Adobe app needs (patches 0093, 0094).
 - **Acrobat Pro installs and works.** Wine can now apply the update patches Acrobat's installer uses (0097, written
-  clean-room from a behaviour description and checked against Windows: all 3534 of Acrobat's patches come out
+  from a behaviour description and checked against Windows: all 3534 of Acrobat's patches come out
   identical), and installs the update's files from the right place (0096, 0098). 22 everyday functions tested and
   working: open and read, comments and highlights, adding text, rotating, form fields, combining, extracting and
   deleting pages, export to Word, Excel, PowerPoint, RTF, text, JPEG and PNG, signing with a digital ID, zoom and

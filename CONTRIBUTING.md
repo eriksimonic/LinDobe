@@ -1,6 +1,6 @@
-# Contributing to AdobeWine
+# Contributing to LinDobe
 
-Thank you for helping. AdobeWine is tested on one machine so far; every report from other
+Thank you for helping. LinDobe is tested on one machine so far; every report from other
 hardware is valuable, positive or negative.
 
 ## Testing and reporting
@@ -36,14 +36,14 @@ every patch still applies to Wine 11.20.
 
 ## Upstreaming
 
-Most AdobeWine patches are general Wine fixes. Getting them into WineHQ
+Most LinDobe patches are general Wine fixes. Getting them into WineHQ
 (<https://gitlab.winehq.org/wine/wine>) helps every Wine user and shrinks this patch set.
 Upstream wants Wine-style tests in `dlls/*/tests`; converting our tests to that form is a
 great first contribution.
 
 ## Ground rules
 
-- No licence circumvention, cracks, or anything that weakens Adobe's sign-in. AdobeWine
+- No licence circumvention, cracks, or anything that weakens Adobe's sign-in. LinDobe
   must stay usable only with a legitimate subscription.
 - Be kind; see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - By contributing you agree your contribution is licensed under LGPL-2.1-or-later.

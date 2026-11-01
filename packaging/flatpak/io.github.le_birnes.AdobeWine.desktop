@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=AdobeWine
+Name=LinDobe
 Comment=Adobe Creative Cloud apps on Linux: set up, open, update
 Exec=adobewine-hub
 Icon=io.github.le_birnes.AdobeWine

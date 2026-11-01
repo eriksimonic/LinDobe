@@ -1,5 +1,5 @@
 name: Compatibility report
-description: Tell us how AdobeWine runs on your system (works, partly works, or not)
+description: Tell us how LinDobe runs on your system (works, partly works, or not)
 title: "[compat] <app> on <distribution> / <GPU>"
 labels: [compatibility]
 body:
@@ -20,7 +20,7 @@ body:
     attributes: { label: Desktop and session, placeholder: "GNOME 48 Wayland" }
   - type: input
     id: version
-    attributes: { label: AdobeWine version, placeholder: "0.2.2 (adobewine-bin)" }
+    attributes: { label: LinDobe version, placeholder: "0.2.2 (adobewine-bin)" }
   - type: checkboxes
     id: apps
     attributes:

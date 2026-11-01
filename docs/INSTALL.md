@@ -1,14 +1,14 @@
-# Installing AdobeWine
+# Installing LinDobe
 
 ## The easy way: one file (any distribution)
 
-1. Download **CCINSTALLER.flatpak** from the [releases page](https://github.com/le-birnes/AdobeWine/releases) (the newest is at the top).
+1. Download **CCINSTALLER.flatpak** from the [releases page](https://github.com/le-birnes/LinDobe/releases) (the newest is at the top).
 2. Double-click it. Your app store opens (GNOME Software, KDE Discover, Mint's Software Manager): click **Install**.
-3. Click **Open** (or find **AdobeWine** in your app menu). Everything else happens by itself: it checks your
+3. Click **Open** (or find **LinDobe** in your app menu). Everything else happens by itself: it checks your
    computer, sets up, downloads Adobe's Creative Cloud installer from adobe.com and starts it. It ends at Adobe's
-   sign-in. Sign in, then install your apps from Creative Cloud; they appear in the AdobeWine window.
+   sign-in. Sign in, then install your apps from Creative Cloud; they appear in the LinDobe window.
 
-You need an Adobe Creative Cloud subscription and about 25 GB of free space. AdobeWine contains no Adobe software
+You need an Adobe Creative Cloud subscription and about 25 GB of free space. LinDobe contains no Adobe software
 and is not affiliated with Adobe.
 
 If double-clicking does nothing, your system has no Flatpak yet (Ubuntu ships without it). Install it once:
@@ -17,13 +17,13 @@ If double-clicking does nothing, your system has no Flatpak yet (Ubuntu ships wi
 sudo apt install flatpak gnome-software-plugin-flatpak    # Ubuntu, Debian
 ```
 
-or install AdobeWine from a terminal on any distribution that has Flatpak:
+or install LinDobe from a terminal on any distribution that has Flatpak:
 
 ```sh
 flatpak install --user ~/Downloads/CCINSTALLER.flatpak
 ```
 
-The rest of this page is for people who prefer a native package or want to build AdobeWine themselves.
+The rest of this page is for people who prefer a native package or want to build LinDobe themselves.
 
 
 This guide is for any Linux distribution. On Arch Linux or an Arch-based distribution
@@ -35,7 +35,7 @@ You need:
 
 - a 64-bit x86 PC with a **Vulkan-capable GPU and driver** (NVIDIA proprietary driver,
   or Mesa RADV / ANV for AMD / Intel), see [COMPATIBILITY.md](COMPATIBILITY.md);
-- an **Adobe Creative Cloud subscription** (AdobeWine contains no Adobe software);
+- an **Adobe Creative Cloud subscription** (LinDobe contains no Adobe software);
 - about **25 GB** of free disk space (Wine build ~8 GB, each Adobe app 3-10 GB);
 - for the best results, **fonts from your own Windows installation** (a Windows
   partition, or a copy of `C:\Windows\Fonts`). Adobe's interface uses Segoe UI, and
@@ -75,7 +75,7 @@ sudo zypper install git ccache mingw64-cross-gcc mingw32-cross-gcc winetricks cu
 
 ### Runtime dependencies only
 
-If you use a prebuilt runtime (see "Prebuilt runtime" below) you only need what AdobeWine
+If you use a prebuilt runtime (see "Prebuilt runtime" below) you only need what LinDobe
 needs to *run*:
 
 ```sh
@@ -119,11 +119,11 @@ work outside Arch, building from source (below) is the better choice.
 
 If `adobewine setup` fails with missing-library or glibc errors, build from source instead.
 
-## 2. Get AdobeWine and build it
+## 2. Get LinDobe and build it
 
 ```sh
-git clone https://github.com/le-birnes/AdobeWine.git
-cd AdobeWine
+git clone https://github.com/le-birnes/LinDobe.git
+cd LinDobe
 scripts/build-wine.sh          # 20-60 minutes the first time
 ```
 
@@ -187,10 +187,10 @@ adobewine photoshop        # or illustrator, premiere, audition, encoder, cc
 
 To close everything cleanly (the apps may ask to save): `adobewine off`.
 
-## Updating AdobeWine
+## Updating LinDobe
 
 ```sh
-cd AdobeWine && git pull && scripts/build-wine.sh
+cd LinDobe && git pull && scripts/build-wine.sh
 ```
 
 Your prefix and installed apps stay as they are. Run `adobewine setup` again if the release

@@ -3,19 +3,19 @@
   <id>io.github.le_birnes.AdobeWine</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>LGPL-2.1-or-later</project_license>
-  <name>AdobeWine</name>
+  <name>LinDobe</name>
   <summary>Run Adobe Creative Cloud apps on Linux</summary>
   <description>
-    <p>AdobeWine sets up a patched Wine for Adobe's apps: Photoshop, Illustrator, Premiere Pro, After Effects,
+    <p>LinDobe sets up a patched Wine for Adobe's apps: Photoshop, Illustrator, Premiere Pro, After Effects,
       Audition, Media Encoder and InDesign. It downloads Adobe's current Creative Cloud installer from Adobe, and
       you sign in with your own Adobe account. No terminal is needed.</p>
-    <p>AdobeWine contains no Adobe software and is not affiliated with or endorsed by Adobe. A Creative Cloud
+    <p>LinDobe contains no Adobe software and is not affiliated with or endorsed by Adobe. A Creative Cloud
       subscription is required.</p>
   </description>
   <launchable type="desktop-id">io.github.le_birnes.AdobeWine.desktop</launchable>
-  <url type="homepage">https://github.com/le-birnes/AdobeWine</url>
-  <url type="bugtracker">https://github.com/le-birnes/AdobeWine/issues</url>
-  <developer id="io.github.le_birnes"><name>AdobeWine contributors</name></developer>
+  <url type="homepage">https://github.com/le-birnes/LinDobe</url>
+  <url type="bugtracker">https://github.com/le-birnes/LinDobe/issues</url>
+  <developer id="io.github.le_birnes"><name>LinDobe contributors</name></developer>
   <content_rating type="oars-1.1"/>
   <releases>
     <release version="0.5.4" date="2026-11-01"/>

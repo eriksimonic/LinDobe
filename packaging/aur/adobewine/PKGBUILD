@@ -1,11 +1,11 @@
-# Maintainer: AdobeWine contributors (see https://github.com/le-birnes/AdobeWine)
+# Maintainer: LinDobe contributors (see https://github.com/le-birnes/LinDobe)
 pkgname=adobewine
 pkgver=0.5.4
 _winever=11.20
 pkgrel=1
-pkgdesc="AdobeWine: Wine ${_winever} with patches for Adobe Creative Cloud apps (Photoshop, Illustrator, Premiere Pro, Audition, Media Encoder)"
+pkgdesc="LinDobe: Wine ${_winever} with patches for Adobe Creative Cloud apps (Photoshop, Illustrator, Premiere Pro, Audition, Media Encoder)"
 arch=(x86_64)
-url="https://github.com/le-birnes/AdobeWine"
+url="https://github.com/le-birnes/LinDobe"
 license=(LGPL-2.1-or-later)
 options=(!lto !debug staticlibs)
 depends=(
@@ -30,12 +30,12 @@ optdepends=(
 )
 source=("adobewine-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz"
         "https://dl.winehq.org/wine/source/11.x/wine-${_winever}.tar.xz")
-sha256sums=('566566f87d7c112d90015b9aa2e263d59b3e4d7860cfc64715b35b93e035d30e'
+sha256sums=('06c62bd18956f0bf85bb048cd99541323dcc532d72be4bcab29aa3953d0d68cf'
             'eac8ca448f9c0087f963026b4dc276d1e2b7fbb64056edc093e59bbb7e56fe28')
 
 prepare() {
   cd "wine-${_winever}"
-  for p in "$srcdir/AdobeWine-${pkgver}"/patches/*.patch; do
+  for p in "$srcdir/LinDobe-${pkgver}"/patches/*.patch; do
     patch -Np1 -i "$p" >/dev/null || { echo "patch failed: ${p##*/}"; return 1; }
   done
   rm -rf "$srcdir/build"; mkdir "$srcdir/build"
@@ -48,7 +48,7 @@ build() {
       --enable-archs=x86_64,i386 --enable-build-id
   make
   # Small Windows helpers, prebuilt so users need no MinGW compiler.
-  cd "$srcdir/AdobeWine-${pkgver}"
+  cd "$srcdir/LinDobe-${pkgver}"
   x86_64-w64-mingw32-gcc -O2 -shared -o d3d12.dll shims/d3d12/d3d12shim.c shims/d3d12/d3d12.def \
       -Wl,--enable-stdcall-fixup
   x86_64-w64-mingw32-gcc -O2 -o winclose.exe tools/winclose/winclose.c
@@ -58,7 +58,7 @@ build() {
 package() {
   cd "$srcdir/build"
   make DESTDIR="$pkgdir" install
-  cd "$srcdir/AdobeWine-${pkgver}"
+  cd "$srcdir/LinDobe-${pkgver}"
   install -d "$pkgdir/opt/adobewine/lib"
   cp -r bin config scripts shims tools patches docs README.md LICENSE VERSION "$pkgdir/opt/adobewine/"
   install -m644 d3d12.dll winclose.exe d3d12fl.exe "$pkgdir/opt/adobewine/lib/"

@@ -1,10 +1,13 @@
-# AdobeWine
+# LinDobe
 
-**Run Adobe Creative Cloud on Linux: Photoshop, Illustrator, Premiere Pro, Lightroom, Acrobat and more.**
+**An Adobe adapter for Wine on Linux: run Photoshop, Illustrator, Premiere Pro, Lightroom, Acrobat and more.**
+
+LinDobe was called AdobeWine until November 2026. It's an independent project, not made by or affiliated with Adobe.
+The `adobewine` command, package names and Flatpak ID keep their old spelling for now, so current installs keep working.
 
 Hi, and welcome! Thanks for stopping by.
 
-AdobeWine is for people who would like to try Linux but need Adobe's apps for their work. You install it, sign
+LinDobe is for people who would like to try Linux but need Adobe's apps for their work. You install it, sign
 in with your own Adobe account, and use the apps as usual, with your graphics card doing the heavy lifting.
 
 It's made for people who just want to enjoy their software: one package to install, no Wine knowledge needed.
@@ -13,7 +16,7 @@ AI was used as a tool to build it, and we say so plainly: see [Why this exists](
 **See it in action:** [a short showreel (1:24)](https://youtu.be/3Vbzt4cGSQQ), made entirely in these apps on
 Linux, from the painting to the final export.
 
-> **Still early (0.5.4).** AdobeWine is built and tested day to day on one Arch-based laptop (CachyOS, NVIDIA RTX
+> **Still early (0.5.4).** LinDobe is built and tested day to day on one Arch-based laptop (CachyOS, NVIDIA RTX
 > 4070). The installer also runs on Fedora, Ubuntu, Debian, Linux Mint, openSUSE and others, but those have had less
 > real-world use. If you try it, please tell us how it went, good or bad: it really helps.
 
@@ -25,11 +28,11 @@ Creative Cloud subscription.
 1. **Download** `CCINSTALLER.flatpak` from the [releases page](../../releases) (the newest is at the top).
 2. **Double-click** the file. Your app store opens (GNOME Software, KDE Discover or Mint's Software Manager).
    Click **Install**.
-3. **Open AdobeWine** from your app menu. It checks your computer, sets everything up, downloads Creative Cloud
+3. **Open LinDobe** from your app menu. It checks your computer, sets everything up, downloads Creative Cloud
    from Adobe and starts it. This takes about a minute.
 4. **Sign in** with your Adobe account in the window that appears.
 5. **Install your apps** (Photoshop, Premiere Pro…) from Creative Cloud, as you would on Windows or a Mac.
-   They show up in the AdobeWine window and in your app menu.
+   They show up in the LinDobe window and in your app menu.
 
 **Nothing happens when you double-click?** Your system doesn't have Flatpak yet (Ubuntu and Debian don't by
 default). Open a terminal, type this once, then try again:
@@ -38,7 +41,7 @@ default). Open a terminal, type this once, then try again:
 sudo apt install flatpak gnome-software-plugin-flatpak
 ```
 
-**Something not working?** Click **Report a problem** in the AdobeWine window. It shows you the report before
+**Something not working?** Click **Report a problem** in the LinDobe window. It shows you the report before
 anything is sent. More help: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## What works
@@ -62,7 +65,7 @@ Details for each app: [docs/STATUS.md](docs/STATUS.md).
 
 ## Good to know
 
-- **You need your own Adobe subscription.** AdobeWine contains no Adobe software and doesn't crack or bypass
+- **You need your own Adobe subscription.** LinDobe contains no Adobe software and doesn't crack or bypass
   anything: you download Creative Cloud from Adobe and sign in normally.
 - **NVIDIA is the best-tested graphics card.** Intel graphics start fine in our tests. AMD has fewer reports so
   far: Photoshop works, Premiere is being tested. NVIDIA-only features (CUDA, NVENC) aren't available on AMD or
@@ -70,14 +73,14 @@ Details for each app: [docs/STATUS.md](docs/STATUS.md).
 - **After Effects can use a lot of memory** while previewing Cinema 4D scenes. Turning off *Cache Frames When
   Idle* and *Multi-Frame Rendering* keeps it in check.
 - **Not affiliated with Adobe.** "Adobe", "Photoshop", "Illustrator", "Premiere Pro", "Audition" and "Creative
-  Cloud" are trademarks of Adobe Inc., used here only to say which programs AdobeWine runs.
+  Cloud" are trademarks of Adobe Inc., used here only to say which programs LinDobe runs.
 
 ## Other ways to install
 
-- **Arch Linux, CachyOS, EndeavourOS, Manjaro, Garuda:** one command, on the platform AdobeWine is developed on:
+- **Arch Linux, CachyOS, EndeavourOS, Manjaro, Garuda:** one command, on the platform LinDobe is developed on:
 
   ```sh
-  sudo pacman -U https://github.com/le-birnes/AdobeWine/releases/download/v0.5.4/adobewine-0.5.4-1-x86_64.pkg.tar.zst
+  sudo pacman -U https://github.com/le-birnes/LinDobe/releases/download/v0.5.4/adobewine-0.5.4-1-x86_64.pkg.tar.zst
   adobewine setup
   ```
 
@@ -107,7 +110,7 @@ make it work for everyone else.
 
 ## How it works (for the curious)
 
-AdobeWine is [Wine](https://www.winehq.org) 11.20, the compatibility layer that also runs Windows games on Steam,
+LinDobe is [Wine](https://www.winehq.org) 11.20, the compatibility layer that also runs Windows games on Steam,
 plus 104 fixes for what Adobe's apps need. Each fix comes from comparing the same task on Windows and under Wine,
 with a small test program that shows the difference. Every fix is listed in [docs/PATCHES.md](docs/PATCHES.md), the
 method is in [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md), and the code is public under Wine's own license. WineHQ doesn't accept AI-written code, so these fixes aren't

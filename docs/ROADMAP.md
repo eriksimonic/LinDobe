@@ -1,19 +1,19 @@
 # Roadmap
 
-Where AdobeWine is going, how far along it is, and where you can help. Comments, ideas and
+Where LinDobe is going, how far along it is, and where you can help. Comments, ideas and
 disagreement are welcome in the [roadmap discussion](../../../discussions/9), or open an issue
 for anything specific.
 
 ## The goal: 100% usable
 
 An app counts as **100% usable** when every function it has on Windows either works under
-AdobeWine or behaves exactly as it does on Windows (same output within tolerance, same
+LinDobe or behaves exactly as it does on Windows (same output within tolerance, same
 error). Functions that need hardware a machine doesn't have (CUDA on AMD, for example) count
 as n.a., not as failures.
 
 How we check: a Windows reference machine lists every function of each app (menus, filters,
 effects, export formats...) and saves a reference output for each one. The same steps then run
-under AdobeWine, and the outputs are compared objectively (pixels, audio, file properties), not
+under LinDobe, and the outputs are compared objectively (pixels, audio, file properties), not
 by eye. Each app gets a checklist, and its score is PASS / (functions - n.a.).
 
 Beyond the per-app checklists, five gates apply to all apps:
@@ -73,7 +73,7 @@ Dates after M2 depend on what the checklists show.
 - **One file for every distribution** (from 2026-10-24): `CCINSTALLER.flatpak` installs with a double-click on
   Fedora, Mint, Ubuntu, Debian, openSUSE, Arch and the rest, sets everything up and stops at Adobe's sign-in. No
   terminal and no Wine build. Next: updates through the software center, then Flathub.
-- **Not sent to WineHQ:** WineHQ doesn't accept AI-written code, so AdobeWine's own fixes stay here, public under
+- **Not sent to WineHQ:** WineHQ doesn't accept AI-written code, so LinDobe's own fixes stay here, public under
   Wine's license. Fixes written by contributors can go upstream by them.
 - A [showreel](https://youtu.be/3Vbzt4cGSQQ) (2026-10-23) made end to end in the seven apps under Wine: it
   exercised pen pressure, 3D text, layout, generated audio, aerender and a Premiere + Media Encoder
