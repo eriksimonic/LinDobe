@@ -1,6 +1,6 @@
 # Maintainer: LinDobe contributors (see https://github.com/le-birnes/LinDobe)
 pkgname=adobewine-bin
-pkgver=0.5.4
+pkgver=0.5.5
 pkgrel=1
 pkgdesc="LinDobe (prebuilt): Wine 11.20 with patches for Adobe Creative Cloud apps (Photoshop, Illustrator, Premiere Pro, Audition, Media Encoder)"
 arch=(x86_64)

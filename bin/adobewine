@@ -114,6 +114,11 @@ core_fonts() {
     while read -r f; do mkdir -p "$d"; cp -n "$f" "$d/"; done
 }
 core_fonts
+# Premiere on AMD: the GPU path known to work is AMD's OpenCL. A Flatpak sandbox can't see the host's driver files.
+if [ "$cmd" = premiere ] && [ ! -e /.flatpak-info ] && [ ! -e /proc/driver/nvidia/version ] &&
+   grep -qs 0x1002 /sys/class/drm/card[0-9]/device/vendor && ! ls /etc/OpenCL/vendors/amdocl*.icd >/dev/null 2>&1; then
+  echo "AMD GPU without AMD's OpenCL driver: Premiere may scrub black frames. Install rocm-opencl-runtime (see Troubleshooting)."
+fi
 log="$ADOBEWINE_HOME/logs/$cmd-$(date +%Y%m%d-%H%M%S).log"
 echo "log: $log"
 start=$SECONDS

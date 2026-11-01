@@ -68,7 +68,7 @@ checkout of the AUR package installs them without building anything.
 > package from the [release](https://github.com/le-birnes/LinDobe/releases). pacman fetches the dependencies:
 >
 > ```sh
-> sudo pacman -U https://github.com/le-birnes/LinDobe/releases/download/v0.5.4/adobewine-0.5.4-1-x86_64.pkg.tar.zst
+> sudo pacman -U https://github.com/le-birnes/LinDobe/releases/download/v0.5.5/adobewine-0.5.5-1-x86_64.pkg.tar.zst
 > ```
 >
 > Or build it from this repository:

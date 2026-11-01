@@ -47,6 +47,8 @@ ram="$(awk '/MemTotal/{printf "%.0f GB", $2/1048576}' /proc/meminfo)"
 gpus="$(lspci 2>/dev/null | grep -Ei 'vga compatible|3d controller|display controller' | cut -d' ' -f2- || echo 'lspci not available')"
 nv="$(cat /sys/module/nvidia/version 2>/dev/null || echo none)"
 vk="$(command -v vulkaninfo >/dev/null && vulkaninfo --summary 2>/dev/null | grep -E 'deviceName|driverInfo|apiVersion' | sed 's/^[[:space:]]*//' || echo 'vulkaninfo not installed')"
+ocl_icds="$(ls /etc/OpenCL/vendors 2>/dev/null | tr '\n' ' ')"
+ocl_devs="$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed 's/^[[:space:]]*//' || echo 'clinfo not available')"
 mesa="$(command -v pacman >/dev/null && pacman -Q mesa 2>/dev/null; command -v dpkg-query >/dev/null && dpkg-query -W libgl1-mesa-dri 2>/dev/null; command -v rpm >/dev/null && rpm -q mesa-dri-drivers 2>/dev/null)"
 desktop="${XDG_CURRENT_DESKTOP:-unknown} (${XDG_SESSION_TYPE:-unknown} session)"
 wine_ver="$(wine --version 2>/dev/null || echo 'no runtime')"
@@ -98,6 +100,9 @@ OUT="$ADOBEWINE_HOME/reports/report-$TS.md"
   echo '```'
   echo "$gpus"
   echo "$vk"
+  echo
+  echo "OpenCL drivers: ${ocl_icds:-none}"
+  echo "$ocl_devs"
   echo '```'
   echo "**Memory** (when the report was made; Wine processes still running: ${wine_left:-0}, /dev/shm: ${shm:-?})"
   echo '```'

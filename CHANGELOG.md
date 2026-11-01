@@ -1,11 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.5.5 - 2026-11-01
 
 - **AdobeWine is now LinDobe**, an Adobe adapter for Wine on Linux. It's an independent project, not made by or
   affiliated with Adobe. The repository moved to `le-birnes/LinDobe`, and old links redirect. The `adobewine` command,
   package names, Flatpak ID and data folders stay as they are for now, so existing installs and the 0.5.4 steps keep
   working.
+- **Premiere on AMD no longer needs a manual setting for black frames.** LinDobe now sets the compile option AMD's
+  OpenCL needs, found by the reporter in #15. Without AMD's driver, the launcher points you to it, and
+  `adobewine report` now lists the OpenCL drivers.
+- **Tested on Intel graphics.** On an Iris Xe laptop GPU, with NVIDIA switched off: Photoshop's 30 most-used functions
+  gave the same results as on NVIDIA, and Premiere's 24 scripted functions exported correctly. Premiere rejects this GPU
+  ("Hardware out of date") and renders on the CPU there, so it's slower.
 - Patch 0097's notes no longer call it clean-room. They now describe how it was made, including that its specification
   came from a study that decompiled Windows' mspatcha.dll.
 

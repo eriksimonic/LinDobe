@@ -47,9 +47,10 @@ H.264/HEVC) work through nvidia-libs.
 | NVIDIA RTX 20/30/40/50, proprietary or open driver 550+ | **works (tested on RTX 4070)** | CUDA and NVENC available to Premiere and Media Encoder |
 | NVIDIA GTX 900/1000/1600 | should work | older Vulkan feature levels; CUDA works on Pascal+ |
 | NVIDIA with nouveau/NVK | untested | NVK Vulkan is improving; no CUDA/NVENC |
-| AMD RDNA 1-4 (RADV) | Photoshop works (RX 7900 XTX, #15); Premiere: quit after the splash, fix in patch 0085 awaiting confirmation on AMD | no CUDA: Premiere falls back to software rendering or OpenCL; no AMF hardware encoding through Wine |
+| AMD RDNA 1-4 (RADV) | Photoshop works (RX 7900 XTX, #15); Premiere starts and uses the GPU through OpenCL (0085, confirmed in #15); AMD's `rocm-opencl-runtime` is the tested driver | no CUDA: Premiere falls back to software rendering or OpenCL; no AMF hardware encoding through Wine |
 | AMD GCN 3-5 (RADV) | untested | |
-| Intel Arc / Xe (ANV) | untested | Iris Xe tested only as display GPU; no Quick Sync through Wine |
+| Intel Iris Xe (ANV) | **works (tested)** | Photoshop most-used 30/30, same results as NVIDIA. Premiere scripted 24/24, but it rejects the GPU ("Hardware out of date") and renders on the CPU. No Quick Sync through Wine |
+| Intel Arc (ANV) | untested | |
 | Hybrid Intel/AMD + NVIDIA | **works (tested)** | LinDobe enables PRIME offload automatically |
 
 ## Community reports

@@ -34,6 +34,11 @@ First steps for any problem:
 
 ## Media
 
+- **Premiere on AMD: black frames while scrubbing, or the GPU isn't used.** Install AMD's OpenCL driver, for example
+  `rocm-opencl-runtime` on Arch. LinDobe sets the compile option this driver needs (#15). With Mesa's rusticl the black
+  frames were seen too, and we don't know yet whether that option helps there. To compare, `OCL_ICD_VENDORS=/nonexistent
+  adobewine premiere` starts Premiere on the software renderer. In the Flatpak, AMD's host driver isn't available.
+
 | Symptom | What to do |
 |---|---|
 | MP4/MKV files do not import or play | Install GStreamer plugins: `gst-plugins-good`, `gst-plugins-bad`, `gst-libav` (names vary by distribution) |

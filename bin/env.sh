@@ -36,6 +36,8 @@ if [ "${ADOBEWINE_NVIDIA_OFFLOAD:-auto}" = 1 ] || { [ "${ADOBEWINE_NVIDIA_OFFLOA
   export __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only
 fi
 [ -e /proc/driver/nvidia/version ] && export DXVK_ENABLE_NVAPI=1
+# AMD's OpenCL rejects some of Premiere's kernels without this, and those clips scrub black (#15). Only AMD's driver reads it.
+export AMD_OCL_BUILD_OPTIONS_APPEND="${AMD_OCL_BUILD_OPTIONS_APPEND--Wf,-Wno-error=incompatible-pointer-types}"
 
 # Creative Cloud and its helpers write to heap blocks after freeing them; patch 0032 keeps
 # freed blocks out of reuse for a while in these processes only.
