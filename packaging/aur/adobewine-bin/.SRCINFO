@@ -1,6 +1,6 @@
 pkgbase = adobewine-bin
 	pkgdesc = AdobeWine (prebuilt): Wine 11.20 with patches for Adobe Creative Cloud apps (Photoshop, Illustrator, Premiere Pro, Audition, Media Encoder)
-	pkgver = 0.5.2
+	pkgver = 0.5.3
 	pkgrel = 1
 	url = https://github.com/le-birnes/AdobeWine
 	arch = x86_64
@@ -41,7 +41,7 @@ pkgbase = adobewine-bin
 	conflicts = adobewine
 	options = !strip
 	options = !debug
-	source = https://github.com/le-birnes/AdobeWine/releases/download/v0.5.2/adobewine-0.5.2-x86_64.tar.zst
-	sha256sums = 848f8f73d3ecf0f938a4d4d4cc97ad4e6e62447376e129d1798b0f818c0e49f6
+	source = https://github.com/le-birnes/AdobeWine/releases/download/v0.5.3/adobewine-0.5.3-x86_64.tar.zst
+	sha256sums = 22c10cc3e4e905058bfea78d3e3d3aa28d3c6d8a4046738cf861ce2fbc53dee3
 
 pkgname = adobewine-bin
