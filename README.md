@@ -2,7 +2,7 @@
 
 **An Adobe adapter for Wine on Linux: run Photoshop, Illustrator, Premiere Pro, Lightroom, Acrobat and more.**
 
-LinDobe was called AdobeWine until November 2026. It's an independent project, not made by or affiliated with Adobe.
+LinDobe was called AdobeWine until November 2026. The project was renamed to avoid using a trademarked name. It's an independent project, not made by or affiliated with Adobe.
 The `adobewine` command, package names and Flatpak ID keep their old spelling for now, so current installs keep working.
 
 Hi, and welcome! Thanks for stopping by.
