@@ -45,7 +45,11 @@ os="$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-unknown}")"
 cpu="$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//')"
 ram="$(awk '/MemTotal/{printf "%.0f GB", $2/1048576}' /proc/meminfo)"
 gpus="$(lspci 2>/dev/null | grep -Ei 'vga compatible|3d controller|display controller' | cut -d' ' -f2- || echo 'lspci not available')"
-nv="$(cat /sys/module/nvidia/version 2>/dev/null || echo none)"
+# /sys/module is not visible inside the Flatpak: fall back to /proc and nvidia-smi before saying none
+nv="$(cat /sys/module/nvidia/version 2>/dev/null)"
+[ -n "$nv" ] || nv="$(grep -o 'Module for [^ ]*  *[0-9][0-9.]*' /proc/driver/nvidia/version 2>/dev/null | awk '{print $NF}' | head -n 1)"
+[ -n "$nv" ] || nv="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n 1)"
+[ -n "$nv" ] || nv=none
 vk="$(command -v vulkaninfo >/dev/null && vulkaninfo --summary 2>/dev/null | grep -E 'deviceName|driverInfo|apiVersion' | sed 's/^[[:space:]]*//' || echo 'vulkaninfo not installed')"
 ocl_icds="$(ls /etc/OpenCL/vendors 2>/dev/null | tr '\n' ' ')"
 ocl_devs="$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed 's/^[[:space:]]*//' || echo 'clinfo not available')"

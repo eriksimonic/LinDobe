@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `adobewine report` shows the NVIDIA driver inside the Flatpak too. It used to say "none" there (#26).
+
 ## 0.5.5 - 2026-11-01
 
 - **AdobeWine is now LinDobe**, an Adobe adapter for Wine on Linux. It's an independent project, not made by or
