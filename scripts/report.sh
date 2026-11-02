@@ -50,6 +50,12 @@ nv="$(cat /sys/module/nvidia/version 2>/dev/null)"
 [ -n "$nv" ] || nv="$(grep -o 'Module for [^ ]*  *[0-9][0-9.]*' /proc/driver/nvidia/version 2>/dev/null | awk '{print $NF}' | head -n 1)"
 [ -n "$nv" ] || nv="$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n 1)"
 [ -n "$nv" ] || nv=none
+# Inside the Flatpak the GPU driver comes from GL extensions (org.freedesktop.Platform.GL.*); NVIDIA's has to match
+# the host driver exactly, or the sandbox has no NVIDIA Vulkan driver.
+glx="unknown (no GL extension folder)"
+if [ -d /usr/lib/x86_64-linux-gnu/GL ]; then
+  glx="$(ls /usr/lib/x86_64-linux-gnu/GL 2>/dev/null | tr '\n' ' ')"; [ -n "$glx" ] || glx="none"
+fi
 vk="$(command -v vulkaninfo >/dev/null && vulkaninfo --summary 2>/dev/null | grep -E 'deviceName|driverInfo|apiVersion' | sed 's/^[[:space:]]*//' || echo 'vulkaninfo not installed')"
 ocl_icds="$(ls /etc/OpenCL/vendors 2>/dev/null | tr '\n' ' ')"
 ocl_devs="$(command -v clinfo >/dev/null && clinfo -l 2>/dev/null | sed 's/^[[:space:]]*//' || echo 'clinfo not available')"
@@ -98,6 +104,7 @@ OUT="$ADOBEWINE_HOME/reports/report-$TS.md"
   echo "| Desktop | $desktop |"
   echo "| CPU / RAM | $cpu / $ram |"
   echo "| NVIDIA driver | $nv |"
+  [ -n "${FLATPAK_ID:-}" ] && echo "| Flatpak GL extensions | $glx |"
   echo "| Mesa | ${mesa:-unknown} |"
   echo
   echo "**GPUs**"
