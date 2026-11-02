@@ -3,6 +3,7 @@
 ## Unreleased
 
 - **Hyprland: no more dark boxes around Photoshop's floating labels.** HUD readouts, smart-guide labels, tooltips and the splash showed large black boxes there. Patch 0108 by chikasimp (#23).
+- **Faster interface drawing, from nvb-uy's fork.** Sixteen Wine fixes by nvb-uy (PhotoshopWine), patches 0109-0124: GDI+ drawing is faster with identical pixels (Photoshop's top-30 scripted tasks took 48 s instead of 77 s here), text widths match what is drawn so message boxes stop cutting off letters, file dialog buttons fit their label, windows without an icon show the app's icon, tray icons have names, and no Wine window pops up while the prefix updates. Thanks, nvb-uy!
 - `adobewine report` shows the NVIDIA driver inside the Flatpak too (it used to say "none" there), and lists the Flatpak's GL extensions, whose NVIDIA one has to match the system driver (#26).
 
 ## 0.5.5 - 2026-11-01

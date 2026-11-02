@@ -111,3 +111,10 @@ to WineHQ; help with that is very welcome.
 | 0106 | jscript | The URI functions handle emoji and other surrogate pairs |
 | 0107 | ntdll | The machine ID also comes from `/etc/machine-id`, so Adobe doesn't count the Flatpak as a new device |
 | 0108 | winex11 | Floating overlays (HUD readouts, tooltips, splash) lose their stale dark boxes on compositors that ignore X shapes, such as Hyprland. By chikasimp (#23) |
+| 0109 | wineboot | No Wine window while the prefix updates. By nvb-uy |
+| 0110 | user32 | Windows without an icon of their own show the app's icon instead of the Wine logo. By nvb-uy |
+| 0111 | win32u | Opt-in X11 Driver `Decorated` = `owned`: the window manager frames dialogs, main windows keep their own frame. By nvb-uy |
+| 0112 | explorer | Tray icons carry their tooltip as a name, so XEmbed tray hosts can label them. By nvb-uy |
+| 0113-0118, 0121-0124 | gdiplus, win32u | Faster GDI+ drawing (clipping, anti-aliased fills, alpha blends, downscaling, gradients) with the same pixels. Photoshop's scripted top-30 tasks ran in 48 s instead of 77 s. By nvb-uy |
+| 0119 | win32u | Text widths match what is drawn for fonts without anti-aliasing, so message boxes no longer cut off their last letters. By nvb-uy |
+| 0120 | comdlg32 | Extra buttons in file dialogs are as wide as their label ("Open from Adobe cloud storage"). By nvb-uy |

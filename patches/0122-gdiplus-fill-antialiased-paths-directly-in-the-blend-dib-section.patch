@@ -1,0 +1,230 @@
+From: nvb-uy <105564560+nvb-uy@users.noreply.github.com>
+Subject: [PATCH] gdiplus: Fill antialiased paths directly in the blend DIB section.
+
+Antialiased fills to a device context wrote the brush into a zeroed buffer of their own, which was then copied into the DIB section for the blend. They now fill and premultiply the DIB section in place.
+From nvb-uy/PhotoshopWine (their 0102), LGPL-2.1. Adapted: our gdiplus caches the clip region (update_clip_hrgn, graphics->clip_hrgn) where theirs builds one per call with get_clip_hrgn.
+
+---
+diff --git a/dlls/gdiplus/graphics.c b/dlls/gdiplus/graphics.c
+--- a/dlls/gdiplus/graphics.c
++++ b/dlls/gdiplus/graphics.c
+@@ -679,16 +679,10 @@ void free_blend_cache(void)
+     delete_blend_dib(&blend_cache);
+ }
+ 
+-static GpStatus alpha_blend_hdc_pixels(GpGraphics *graphics, INT dst_x, INT dst_y,
++static void copy_to_blend_dib(GpGraphics *graphics, struct blend_dib *dib,
+     const BYTE *src, INT src_width, INT src_height, INT src_stride, PixelFormat fmt)
+ {
+-    struct blend_dib temp, *dib;
+-    INT stride;
+-
+-    if (!(dib = acquire_blend_dib(src_width, src_height, &temp)))
+-        return Ok;
+-
+-    stride = dib->width * 4;
++    INT stride = dib->width * 4;
+ 
+     if (graphics->hdc &&
+          GetDeviceCaps(graphics->hdc, TECHNOLOGY) == DT_RASPRINTER &&
+@@ -703,12 +697,49 @@ static GpStatus alpha_blend_hdc_pixels(G
+     }
+     else
+         convert_32bppARGB_to_32bppPARGB(src_width, src_height, dib->bits, stride, src, src_stride);
++}
+ 
+-    gdi_alpha_blend(graphics, dst_x, dst_y, src_width, src_height,
+-                    dib->hdc, 0, 0, src_width, src_height);
++static BOOL can_blend_from_dib(GpGraphics *graphics)
++{
++    if (graphics->image)
++        return FALSE;
+ 
+-    release_blend_dib(dib);
++    return !graphics->hdc || GetDeviceCaps(graphics->hdc, TECHNOLOGY) != DT_RASPRINTER ||
++           GetDeviceCaps(graphics->hdc, SHADEBLENDCAPS) != SB_NONE;
++}
+ 
++static GpStatus blend_dib_to_hdc(GpGraphics *graphics, INT dst_x, INT dst_y,
++    INT width, INT height, struct blend_dib *dib, HRGN hregion)
++{
++    GpStatus stat;
++    HDC hdc;
++    int save;
++
++    stat = gdi_dc_acquire(graphics, &hdc);
++    if (stat != Ok)
++        return stat;
++
++    save = SaveDC(hdc);
++
++    if (hregion)
++        ExtSelectClipRgn(hdc, hregion, RGN_COPY);
++    else
++    {
++        stat = update_clip_hrgn(graphics);
++        if (stat != Ok)
++        {
++            RestoreDC(hdc, save);
++            gdi_dc_release(graphics, hdc);
++            return stat;
++        }
++
++        ExtSelectClipRgn(hdc, graphics->clip_hrgn, RGN_COPY);
++    }
++
++    gdi_alpha_blend(graphics, dst_x, dst_y, width, height, dib->hdc, 0, 0, width, height);
++
++    RestoreDC(hdc, save);
++    gdi_dc_release(graphics, hdc);
+     return Ok;
+ }
+ 
+@@ -777,39 +808,14 @@ static GpStatus alpha_blend_pixels_hrgn(
+     }
+     else
+     {
+-        HDC hdc;
+-        int save;
+-
+-        stat = gdi_dc_acquire(graphics, &hdc);
+-
+-        if (stat != Ok)
+-            return stat;
+-
+-        save = SaveDC(hdc);
++        struct blend_dib temp, *dib;
+ 
+-        if (hregion)
+-            ExtSelectClipRgn(hdc, hregion, RGN_COPY);
+-        else
+-        {
+-            stat = update_clip_hrgn(graphics);
+-
+-            if (stat != Ok)
+-            {
+-                RestoreDC(hdc, save);
+-                gdi_dc_release(graphics, hdc);
+-                return stat;
+-            }
+-
+-            ExtSelectClipRgn(hdc, graphics->clip_hrgn, RGN_COPY);
+-        }
+-
+-        stat = alpha_blend_hdc_pixels(graphics, dst_x, dst_y, src, src_width,
+-            src_height, src_stride, fmt);
+-
+-        RestoreDC(hdc, save);
+-
+-        gdi_dc_release(graphics, hdc);
++        if (!(dib = acquire_blend_dib(src_width, src_height, &temp)))
++            return Ok;
+ 
++        copy_to_blend_dib(graphics, dib, src, src_width, src_height, src_stride, fmt);
++        stat = blend_dib_to_hdc(graphics, dst_x, dst_y, src_width, src_height, dib, hregion);
++        release_blend_dib(dib);
+         return stat;
+     }
+ }
+@@ -4729,9 +4735,10 @@ static GpStatus SOFTWARE_GdipFillPathAnt
+     struct span_list spans = { 0 };
+     REAL offset, left, top, right, bottom;
+     GpRectF bounds, device_bounds;
+-    INT *coverage = NULL, *row, x, y, last;
++    INT *coverage = NULL, *row, x, y, last, stride;
+     PixelFormat format = PixelFormat32bppARGB;
+-    DWORD *pixels = NULL;
++    struct blend_dib temp, *dib = NULL;
++    DWORD *pixels = NULL, *buffer = NULL;
+     GpMatrix transform;
+     GpStatus stat;
+     RECT sample_rect, covered;
+@@ -4780,7 +4787,19 @@ static GpStatus SOFTWARE_GdipFillPathAnt
+ 
+     full = is_rect && EqualRect(&covered, &sample_rect);
+ 
+-    pixels = calloc(rect.Width * rect.Height, sizeof(*pixels));
++    if (can_blend_from_dib(graphics) && (dib = acquire_blend_dib(rect.Width, rect.Height, &temp)))
++    {
++        pixels = (DWORD *)dib->bits;
++        stride = dib->width;
++        if (brush->bt == BrushTypePathGradient)
++            for (y = 0; y < rect.Height; y++)
++                memset(pixels + y * stride, 0, rect.Width * sizeof(*pixels));
++    }
++    else
++    {
++        pixels = buffer = calloc(rect.Width * rect.Height, sizeof(*pixels));
++        stride = rect.Width;
++    }
+     if (!full)
+         coverage = calloc(is_rect ? rect.Width : rect.Width * rect.Height, sizeof(*coverage));
+     if (!pixels || (!full && !coverage))
+@@ -4788,7 +4807,7 @@ static GpStatus SOFTWARE_GdipFillPathAnt
+     if (stat == Ok && !is_rect)
+         stat = region_element_to_spans(&element, &sample_rect, &spans);
+     if (stat == Ok)
+-        stat = brush_fill_pixels(graphics, brush, pixels, &rect, rect.Width);
++        stat = brush_fill_pixels(graphics, brush, pixels, &rect, stride);
+     if (stat == Ok && is_rect)
+     {
+         if (full)
+@@ -4804,16 +4823,13 @@ static GpStatus SOFTWARE_GdipFillPathAnt
+             for (y = 0; y < rect.Height; y++)
+             {
+                 INT rows = sample_overlap(sample_rect.top + (y << shift_y), ss_y, covered.top, covered.bottom);
+-                DWORD *line = pixels + y * rect.Width;
++                DWORD *line = pixels + y * stride;
+ 
+                 for (x = 0; x < rect.Width; x++)
+                     line[x] = (line[x] & 0xffffff) |
+                         (((line[x] >> 24) * rows * coverage[x] + (1 << (shift_y + 2))) >> (shift_y + 3) << 24);
+             }
+         }
+-
+-        stat = alpha_blend_pixels(graphics, rect.X, rect.Y, (BYTE *)pixels, rect.Width, rect.Height,
+-            rect.Width * 4, format);
+     }
+     else if (stat == Ok)
+     {
+@@ -4838,18 +4854,34 @@ static GpStatus SOFTWARE_GdipFillPathAnt
+                 row[last] += x1 & 7;
+         }
+ 
+-        for (i = 0; i < rect.Width * rect.Height; i++)
+-            pixels[i] = (pixels[i] & 0xffffff) |
+-                (((pixels[i] >> 24) * coverage[i] + (1 << (shift_y + 2))) >> (shift_y + 3) << 24);
++        for (y = 0; y < rect.Height; y++)
++        {
++            DWORD *line = pixels + y * stride;
+ 
+-        stat = alpha_blend_pixels(graphics, rect.X, rect.Y, (BYTE *)pixels, rect.Width, rect.Height,
+-            rect.Width * 4, PixelFormat32bppARGB);
++            row = coverage + y * rect.Width;
++            for (x = 0; x < rect.Width; x++)
++                line[x] = (line[x] & 0xffffff) |
++                    (((line[x] >> 24) * row[x] + (1 << (shift_y + 2))) >> (shift_y + 3) << 24);
++        }
++    }
++
++    if (stat == Ok && dib)
++    {
++        if (format == PixelFormat32bppARGB)
++            convert_32bppARGB_to_32bppPARGB(rect.Width, rect.Height, (BYTE *)pixels, stride * 4,
++                (BYTE *)pixels, stride * 4);
++        stat = blend_dib_to_hdc(graphics, rect.X, rect.Y, rect.Width, rect.Height, dib, NULL);
+     }
++    else if (stat == Ok)
++        stat = alpha_blend_pixels(graphics, rect.X, rect.Y, (BYTE *)pixels, rect.Width, rect.Height,
++            rect.Width * 4, format);
+ 
+ done:
+     free(spans.spans);
+     free(coverage);
+-    free(pixels);
++    free(buffer);
++    if (dib)
++        release_blend_dib(dib);
+     GdipDeletePath(element.elementdata.path);
+     gdi_transform_release(graphics);
+ 
