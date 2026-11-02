@@ -1,7 +1,8 @@
 winex11, win32u, server: Pen tablets under XWayland: wintab packets and Windows Ink pen pointers.
 
 Under XWayland the XInput1 device events wintab selected almost never arrive (WineHQ bug 53052):
-a whole stroke gave one packet, no pressure. Pens now come from XInput2 raw events of the tablet
+a whole stroke gave one packet, no pressure. Found by NickPittas (public #13), who counted the
+motion events that arrive under XWayland. Pens now come from XInput2 raw events of the tablet
 devices (floating slave pointers with an "Abs Pressure" axis), selected on the root window once
 per process and again when devices are added; raw events don't take the core events away from
 the windows, so the pen keeps moving the mouse.
