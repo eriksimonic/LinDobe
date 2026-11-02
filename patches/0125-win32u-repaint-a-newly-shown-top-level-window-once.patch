@@ -1,0 +1,80 @@
+From: le-birnes <226851066+le-birnes@users.noreply.github.com>
+Subject: [PATCH] win32u: Repaint a newly shown top-level window once.
+
+Stopgap for undrawn Adobe dialogs: After Effects' overwrite dialog came up black in 5 of 6 tries, its first
+frame presented before anything was drawn, and stayed so until the next input or WM_PAINT. A RedrawWindow
+draws it at once. When a top-level window becomes visible, a system timer repaints it once after 150 ms
+(handled inside win32u, the application never sees the timer). WINE_SHOW_REDRAW=<ms> changes the delay,
+0 turns it off; WINE_SHOW_REDRAW_CHILDREN=1 also covers child windows (it did not help Premiere's
+Ducking panel, which changes view without being shown). Not a root-cause fix: that needs a Windows
+comparison of how these surfaces are presented.
+
+---
+diff --color -ruNp a/dlls/win32u/message.c b/dlls/win32u/message.c
+--- a/dlls/win32u/message.c
++++ b/dlls/win32u/message.c
+@@ -4056,6 +4056,14 @@ LRESULT WINAPI NtUserDispatchMessage( co
+             case SYSTEM_TIMER_TRACK_MOUSE:
+                 update_mouse_tracking_info( msg->hwnd );
+                 return 0;
++
++            case SYSTEM_TIMER_SHOW_REDRAW:
++                /* one repaint shortly after the window was shown, see show_window */
++                NtUserKillSystemTimer( msg->hwnd, SYSTEM_TIMER_SHOW_REDRAW );
++                if (get_window_long( msg->hwnd, GWL_STYLE ) & WS_VISIBLE)
++                    NtUserRedrawWindow( msg->hwnd, NULL, 0, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN |
++                                        RDW_UPDATENOW | RDW_FRAME );
++                return 0;
+         }
+     }
+ 
+diff --color -ruNp a/dlls/win32u/ntuser_private.h b/dlls/win32u/ntuser_private.h
+--- a/dlls/win32u/ntuser_private.h
++++ b/dlls/win32u/ntuser_private.h
+@@ -34,6 +34,7 @@
+ 
+ enum system_timer_id
+ {
++    SYSTEM_TIMER_SHOW_REDRAW = 0xfff9,
+     SYSTEM_TIMER_TRACK_MOUSE = 0xfffa,
+     SYSTEM_TIMER_CARET = 0xffff,
+ };
+diff --color -ruNp a/dlls/win32u/window.c b/dlls/win32u/window.c
+--- a/dlls/win32u/window.c
++++ b/dlls/win32u/window.c
+@@ -5080,6 +5080,26 @@ void update_window_state( HWND hwnd )
+  *
+  * Implementation of ShowWindow and ShowWindowAsync.
+  */
++/* Adobe's dialogs and panels can stay black or show their old state after they are shown, until the
++ * next input or WM_PAINT: their first frame is presented undrawn. Repaint a newly shown window once
++ * after a short delay. WINE_SHOW_REDRAW=<ms> sets the delay (0 turns it off, default 150);
++ * WINE_SHOW_REDRAW_CHILDREN=1 also covers child windows. */
++static void schedule_show_redraw( HWND hwnd, DWORD style )
++{
++    static int delay = -1, children;
++
++    if (delay < 0)
++    {
++        const char *s = getenv( "WINE_SHOW_REDRAW_CHILDREN" );
++        children = s && atoi( s );
++        s = getenv( "WINE_SHOW_REDRAW" );
++        delay = s ? max( atoi( s ), 0 ) : 150;
++    }
++    if (!delay || ((style & WS_CHILD) && !children)) return;
++    if (!is_current_thread_window( hwnd )) return;
++    NtUserSetSystemTimer( hwnd, SYSTEM_TIMER_SHOW_REDRAW, delay );
++}
++
+ static BOOL show_window( HWND hwnd, INT cmd )
+ {
+     WND *win;
+@@ -5266,6 +5286,8 @@ static BOOL show_window( HWND hwnd, INT
+             send_message( hwnd, WM_ACTIVATE, WA_ACTIVE, 0 );
+     }
+ 
++    if (!was_visible) schedule_show_redraw( hwnd, style );
++
+ done:
+     set_thread_dpi_awareness_context( context );
+     return was_visible;
