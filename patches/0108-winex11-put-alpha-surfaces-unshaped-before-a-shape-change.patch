@@ -1,0 +1,68 @@
+From: chikasimp <87841459+chikasimp@users.noreply.github.com>
+Subject: [PATCH] winex11: put alpha surfaces unshaped before a shape change.
+
+The bounding shape clips XPutImage, so pixels outside the current shape keep an earlier frame. Compositors that
+ignore X bounding shapes (Hyprland) show them: Photoshop's HUD readouts, smart-guide labels, rich tooltips and
+splash had large dark boxes around them. Before an alpha surface changes shape, put the whole surface unshaped;
+its alpha already holds the cut-out. Only on shape changes: lifting the shape on every put loops on expose.
+From public issue #23 by chikasimp, tested there on Hyprland.
+
+---
+diff --git a/dlls/winex11.drv/bitblt.c b/dlls/winex11.drv/bitblt.c
+index 1f91040..8a1875e 100644
+--- a/dlls/winex11.drv/bitblt.c
++++ b/dlls/winex11.drv/bitblt.c
+@@ -1589,6 +1589,7 @@ struct x11drv_window_surface
+     GC                    gc;
+     struct x11drv_image  *image;
+     BOOL                  byteswap;
++    BOOL                  use_alpha;
+ };
+ 
+ static struct x11drv_window_surface *get_x11_surface( struct window_surface *surface )
+@@ -1832,19 +1833,31 @@ static BOOL x11drv_surface_flush( struct window_surface *window_surface, const R
+     if (shape_changed)
+     {
+ #ifdef HAVE_LIBXSHAPE
+-        if (!shape_bits)
+-            XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, None, ShapeSet );
+-        else
++        Pixmap shape = None;
++
++        if (shape_bits)
+         {
+             struct gdi_image_bits bits = {.ptr = (void *)shape_bits};
+             XVisualInfo vis = default_visual;
+-            Pixmap shape;
+ 
+             vis.depth = 1;
+             shape = create_pixmap_from_image( 0, &vis, shape_info, &bits, DIB_RGB_COLORS );
+-            XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, shape, ShapeSet );
+-            XFreePixmap( gdi_display, shape );
+         }
++        /* The bounding shape clips puts, so pixels outside it keep whatever was there before.
++         * Compositors that ignore X shapes (Hyprland) show those stale pixels. Before an alpha
++         * surface changes shape, put all of it unshaped: its alpha channel holds the same cut-out,
++         * and while the shape stays the same, the pixels outside it stay current. */
++        if (surface->use_alpha)
++        {
++            RECT full = {0, 0, rect->right - rect->left, rect->bottom - rect->top};
++
++            XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, None, ShapeSet );
++            if (!put_shm_image( ximage, &surface->image->shminfo, surface->window, surface->gc, rect, &full ))
++                XPutImage( gdi_display, surface->window, surface->gc, ximage, 0, 0, rect->left, rect->top,
++                           full.right, full.bottom );
++        }
++        XShapeCombineMask( gdi_display, surface->window, ShapeBounding, 0, 0, shape, ShapeSet );
++        if (shape) XFreePixmap( gdi_display, shape );
+ #endif /* HAVE_LIBXSHAPE */
+     }
+ 
+@@ -1943,6 +1956,7 @@ static struct window_surface *create_surface( HWND hwnd, Window window, const XV
+         surface = get_x11_surface( window_surface );
+         surface->image = image;
+         surface->byteswap = byteswap;
++        surface->use_alpha = use_alpha;
+         surface->window = window;
+         surface->gc = XCreateGC( gdi_display, window, 0, NULL );
+         XSetSubwindowMode( gdi_display, surface->gc, IncludeInferiors );

@@ -110,3 +110,4 @@ to WineHQ; help with that is very welcome.
 | 0105 | mshtml | `document.createTreeWalker`, `NodeFilter`, URLs longer than 2084 characters. Adobe's too-many-devices page draws |
 | 0106 | jscript | The URI functions handle emoji and other surrogate pairs |
 | 0107 | ntdll | The machine ID also comes from `/etc/machine-id`, so Adobe doesn't count the Flatpak as a new device |
+| 0108 | winex11 | Floating overlays (HUD readouts, tooltips, splash) lose their stale dark boxes on compositors that ignore X shapes, such as Hyprland. By chikasimp (#23) |

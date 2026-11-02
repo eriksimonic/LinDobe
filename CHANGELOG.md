@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Hyprland: no more dark boxes around Photoshop's floating labels.** HUD readouts, smart-guide labels, tooltips and the splash showed large black boxes there. Patch 0108 by chikasimp (#23).
 - `adobewine report` shows the NVIDIA driver inside the Flatpak too. It used to say "none" there (#26).
 
 ## 0.5.5 - 2026-11-01
