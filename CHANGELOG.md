@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Right app icons in the application menu.** `adobewine launchers` picked tool or document icons for several apps (Photoshop got "ADJUST", After Effects "GENERAL", InDesign the InCopy logo) and lost transparency for others. It now uses each app's default icon at full size with transparent corners; tested here on twelve apps. Contributed in #27.
+- **Arch install instructions download the package first.** `pacman -U` with a web address fails because it asks for a signature file the release doesn't have; download, then install the file.
 - **Hyprland: no more dark boxes around Photoshop's floating labels.** HUD readouts, smart-guide labels, tooltips and the splash showed large black boxes there. Patch 0108 by chikasimp (#23).
 - **After Effects dialogs no longer come up black.** Dialogs such as the overwrite prompt often showed as a black box until you moved the mouse over them. A new window is now repainted once just after it appears (patch 0125; `WINE_SHOW_REDRAW=0` turns it off).
 - **Faster interface drawing, from nvb-uy's fork.** Sixteen Wine fixes by nvb-uy (PhotoshopWine), patches 0109-0124: GDI+ drawing is faster with identical pixels (Photoshop's top-30 scripted tasks took 48 s instead of 77 s here), text widths match what is drawn so message boxes stop cutting off letters, file dialog buttons fit their label, windows without an icon show the app's icon, tray icons have names, and no Wine window pops up while the prefix updates. Thanks, nvb-uy!
