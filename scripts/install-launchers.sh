@@ -18,23 +18,8 @@ latest() {  # newest installed release folder of an app, e.g. "Adobe Photoshop 2
   local d; d="$(ls -d "$PF/$1 20"[0-9][0-9] 2>/dev/null | sort -V | tail -1)"
   basename "${d:-$1 2026}"
 }
-icon() {  # icon <name> <exe>: largest icon from the .exe, or an .ico next to it
-  local tmp; tmp="$(mktemp -d)"
-  if command -v 7z >/dev/null; then 7z x -y -o"$tmp" "$2" '.rsrc/ICON/*' '.rsrc/*/ICON/*' >/dev/null 2>&1 || true; fi
-  cp "$(dirname "$2")"/*Application_Icon*.ico "$tmp"/ 2>/dev/null || true
-  python3 - "$tmp" "$ICONS/adobewine-$1.png" <<'PY' || true
-import sys, glob, os
-from PIL import Image
-best = None
-for f in glob.glob(os.path.join(sys.argv[1], '**', '*.ico'), recursive=True, include_hidden=True):
-    try:
-        im = Image.open(f); size = max(im.info.get('sizes', {im.size}))
-        if not best or size > best[0]: best = (size, f)
-    except Exception: pass
-if best:
-    im = Image.open(best[1]); im.size = best[0]; im.save(sys.argv[2])
-PY
-  rm -rf "$tmp"
+icon() {  # icon <name> <exe>: default icon group, retaining color depth and alpha
+  python3 "$ADOBEWINE_SRC/scripts/extract-app-icon.py" "$2" "$ICONS/adobewine-$1.png" || true
 }
 entry() {  # entry <name> <title> <categories> <mime> <wmclass> <exe>
   [ -f "$6" ] || return 0

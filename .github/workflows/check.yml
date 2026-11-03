@@ -16,5 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: sudo apt-get install -y shellcheck
+      - run: sudo apt-get install -y shellcheck python3-pil
       - run: shellcheck -S error bin/adobewine bin/env.sh scripts/*.sh
+      - run: /usr/bin/python3 -B -m unittest discover -s tests/launcher-icons -v
