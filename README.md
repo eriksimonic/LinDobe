@@ -77,10 +77,11 @@ Details for each app: [docs/STATUS.md](docs/STATUS.md).
 
 ## Other ways to install
 
-- **Arch Linux, CachyOS, EndeavourOS, Manjaro, Garuda:** one command, on the platform LinDobe is developed on:
+- **Arch Linux, CachyOS, EndeavourOS, Manjaro, Garuda:** download the package and install it, on the platform LinDobe is developed on:
 
   ```sh
-  sudo pacman -U https://github.com/le-birnes/LinDobe/releases/download/v0.5.5/adobewine-0.5.5-1-x86_64.pkg.tar.zst
+  curl -LO https://github.com/le-birnes/LinDobe/releases/download/v0.5.5/adobewine-0.5.5-1-x86_64.pkg.tar.zst
+  sudo pacman -U adobewine-0.5.5-1-x86_64.pkg.tar.zst
   adobewine setup
   ```
 

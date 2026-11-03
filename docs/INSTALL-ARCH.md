@@ -65,10 +65,13 @@ checkout of the AUR package installs them without building anything.
 ## 2. Install LinDobe
 
 > **AUR registration pending.** Until `adobewine` / `adobewine-bin` appear on the AUR, install the ready-made
-> package from the [release](https://github.com/le-birnes/LinDobe/releases). pacman fetches the dependencies:
+> package from the [release](https://github.com/le-birnes/LinDobe/releases). Download it first, then install the file;
+> pacman fetches the dependencies. (Giving pacman the web address directly fails: pacman then asks for a
+> signature file, and the release doesn't have one.)
 >
 > ```sh
-> sudo pacman -U https://github.com/le-birnes/LinDobe/releases/download/v0.5.5/adobewine-0.5.5-1-x86_64.pkg.tar.zst
+> curl -LO https://github.com/le-birnes/LinDobe/releases/download/v0.5.5/adobewine-0.5.5-1-x86_64.pkg.tar.zst
+> sudo pacman -U adobewine-0.5.5-1-x86_64.pkg.tar.zst
 > ```
 >
 > Or build it from this repository:
