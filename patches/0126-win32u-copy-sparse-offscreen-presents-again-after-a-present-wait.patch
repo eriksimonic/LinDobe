@@ -1,0 +1,35 @@
+From: le-birnes <226851066+le-birnes@users.noreply.github.com>
+Subject: [PATCH] win32u: Copy sparse offscreen presents again even after a present wait.
+
+Premiere's Essential Sound panel (a DXVK swapchain on a child window, copied to the toplevel by 0020)
+often kept its previous view after a click: the panel's WM_PAINT rendered and presented the new view,
+the copy waited for that present (VK_KHR_present_wait returned) and still picked up the old frame.
+Copying again later, with no new present, showed the new view, so the frame was there, just not yet
+readable when the wait returned. The delayed second copy now runs for every sparse present, not only
+for presents without an id. Ducking test on the hidden screen: 5 of 5 after, about 1 of 3 before.
+
+---
+--- a/dlls/win32u/vulkan.c
++++ b/dlls/win32u/vulkan.c
+@@ -2252,8 +2252,10 @@
+      * host driver may complete the present asynchronously, so that copy can pick up the
+      * previous frame. An app that only presents on change then stays one frame behind for
+      * good. When the app tags its presents with present ids (DXVK and vkd3d-proton do),
+-     * wait for that present to complete and copy again; otherwise, when presents are
+-     * sparse, copy once more after a short wait. */
++     * wait for that present to complete and copy again. When presents are sparse, copy once
++     * more after a short wait in both cases: a completed present wait does not mean the
++     * offscreen window already shows that frame (Premiere's Essential Sound panel kept its
++     * old view after a waited copy, and a later copy with no new present showed the new one). */
+     if (res >= VK_SUCCESS)
+     {
+         static int delay_us = -1;
+@@ -2281,7 +2283,7 @@
+             }
+ 
+             if (waited || (id && can_wait)) client_surface_present( swapchain->surface->client );
+-            if (!waited && now - swapchain->last_present > 25) recopy = TRUE;
++            if (now - swapchain->last_present > 25) recopy = TRUE;
+             swapchain->last_present = now;
+ 
+             if (swapchain->paced && is_fifo_mode( app_present_modes && i < ARRAY_SIZE(host_modes) ?

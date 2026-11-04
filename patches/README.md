@@ -54,5 +54,32 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
   instead of aborting the process. Those subsystems still do not work).
 - 0103 (2026-10-31): new (crypt32: the enumerator's reference under the store's lock; wintrust: no success without
   indirect data. Acrobat crashed at start and acrotray and AdobeCollabSync aborted; test wine/tests/certrace).
+- 0105 (2026-11-01): new (mshtml: createTreeWalker, NodeFilter, URLs over 2084 characters; Adobe's device limit page
+  draws; test wine/tests/treewalker).
+- 0106 (2026-11-01): new (jscript: surrogate pairs in the URI functions).
+- 0107 (2026-11-01): new (ntdll: /etc/machine-id for the system UUID; the Flatpak sandbox has no dbus copy, so Adobe
+  saw a new device).
+- 0108 (2026-11-02): new, by chikasimp (public #23) (winex11: alpha surfaces put unshaped before a shape change;
+  Hyprland showed dark boxes around Photoshop HUD readouts, tooltips and splash). KWin unchanged: Photoshop usage_ui 9/9.
+- 0109-0124 (2026-11-02): new, by nvb-uy, from their fork nvb-uy/PhotoshopWine (LGPL-2.1), each with its original
+  number in the header. 0109 wineboot: no window while the prefix updates. 0110 user32: windows without an icon get the
+  exe's icon instead of the Wine logo. 0111 win32u: X11 Driver Decorated = "owned" (opt-in). 0112 explorer: tray icon
+  windows named after their tooltip. 0113-0118, 0121-0124 gdiplus and 0117 win32u: faster clipping, anti-aliased fills,
+  alpha blends, downscaling and gradients, pixel-identical (private test aapix: 4 HDC frames and a bitmap byte for byte;
+  HDC path 1976 -> 973 ms). 0119 win32u: glyph advances from bi-level hinting in every format, so measured and drawn
+  text agree (Tahoma 9 px sample: 256 measured vs 268 drawn before, 268 both now). 0120 comdlg32: custom push buttons
+  as wide as their label; adapted (our ctrl_resize has a fifth argument). 0122 adapted to our cached clip region.
+  Their 0097 is our 0084. Their 0098 (d2d1 WIC text on the CPU) is parked: one Premiere hang in
+  6 fresh runs with it, UI thread waiting on a WIC target readback; none in 4 without.
+  Wine tests gdiplus, comdlg32, win32u, gdi32 font identical before and after; regress.sh 24/24. Photoshop usage_top 30/30, same
+  measures, 47.8 s vs 77.3 s on the plain runtime the same day; usage_ui 9/9; Premiere usage_top + usage_check 24/24.
+- 0125 (2026-11-02): new, stopgap (win32u: a newly shown top-level window is repainted once after 150 ms; AE's overwrite
+  dialog drew 6 of 6, 1 of 6 without; WINE_SHOW_REDRAW, WINE_SHOW_REDRAW_CHILDREN). Premiere Ducking unchanged (3/6, 2/6
+  with children). Photoshop usage_top 30/30 same measures, usage_ui 10/10 twice; Premiere 24/24.
+- 0126 (2026-11-04): new (win32u: the delayed second copy of an offscreen swapchain runs for every sparse present, also
+  after a successful present wait, which can return before the frame is readable). Root cause of both stale views:
+  Premiere's Essential Sound panel 11/11 vs 3/6 without, After Effects' overwrite dialog 6/6 with 0125 off vs 3/6.
+  regress.sh 24/24 (fontlive skipped), Photoshop usage_ui 10/10 and usage_top 30/30 (48.9 and 47.5 s vs 48.8 and
+  46.4 s without), Premiere usage_ui 7/7 (playback's ruler drag once 9.53 s, then 4/4).
 - 0104 (2026-10-31): new (winex11: an owned popup with a dialog frame is managed; Photoshop's contextual task bar stayed
   above other applications).
