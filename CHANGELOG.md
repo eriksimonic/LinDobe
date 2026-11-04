@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **A warning when the graphics card is nearly full.** On Linux, NVIDIA's driver refuses video memory it doesn't have, where Windows would move other things out of the way. Premiere alone grows to about 5 GB, and Media Encoder keeps over 1 GB after an export, so on an 8 GB card Premiere's panels can come up blank or out of date and exports can fail with a GPU render error. `adobewine premiere`, `aftereffects` and `encoder` now say when less than 3 GB is free and which programs hold it, and after Premiere closes they tell you if panels failed for that reason.
 - **Right app icons in the application menu.** `adobewine launchers` picked tool or document icons for several apps (Photoshop got "ADJUST", After Effects "GENERAL", InDesign the InCopy logo) and lost transparency for others. It now uses each app's default icon at full size with transparent corners; tested here on twelve apps. Contributed in #27.
 - **Arch install instructions download the package first.** `pacman -U` with a web address fails because it asks for a signature file the release doesn't have; download, then install the file.
 - **Hyprland: no more dark boxes around Photoshop's floating labels.** HUD readouts, smart-guide labels, tooltips and the splash showed large black boxes there. Patch 0108 by chikasimp (#23).

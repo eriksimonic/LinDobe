@@ -119,11 +119,26 @@ if [ "$cmd" = premiere ] && [ ! -e /.flatpak-info ] && [ ! -e /proc/driver/nvidi
    grep -qs 0x1002 /sys/class/drm/card[0-9]/device/vendor && ! ls /etc/OpenCL/vendors/amdocl*.icd >/dev/null 2>&1; then
   echo "AMD GPU without AMD's OpenCL driver: Premiere may scrub black frames. Install rocm-opencl-runtime (see Troubleshooting)."
 fi
+# Video memory: NVIDIA on Linux refuses an allocation the GPU has no room for (Windows moves other memory out of the
+# way instead), so with the GPU nearly full Premiere's panels come up blank or stale and exports fail with a GPU render
+# error. Premiere alone grows to about 5 GB; Media Encoder keeps over 1 GB after an export.
+gpu_note() {
+  command -v nvidia-smi >/dev/null || return
+  local free; free=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1)
+  [ -n "$free" ] && [ "$free" -lt 3000 ] 2>/dev/null || return
+  local users; users=$(nvidia-smi --query-compute-apps=process_name,used_memory --format=csv,noheader 2>/dev/null |
+    sed 's#.*[\\/]##' | sort -t, -k2 -rn | head -3 | paste -sd ';' | sed 's/;/; /g')
+  echo "Only $free MiB of video memory is free (${users:-other programs}). Panels may stay blank and exports may fail; close what you don't need."
+}
+case "$cmd" in premiere|aftereffects|encoder) gpu_note ;; esac
 log="$ADOBEWINE_HOME/logs/$cmd-$(date +%Y%m%d-%H%M%S).log"
 echo "log: $log"
 start=$SECONDS
 wine "$exe" "${args[@]}" > "$log" 2>&1
 rc=$?
+if [ "$(grep -c 'Failed to create Vulkan swapchain' "$log" 2>/dev/null)" -gt 20 ]; then
+  echo "$cmd could not create some of its panels: the GPU was out of video memory. Closing other GPU programs (Media Encoder too) helps."
+fi
 # After a crash: offer a report (REPORTS=ask, the default), send it (REPORTS=auto) or do
 # nothing (REPORTS=off), as set in ~/.config/adobewine/config.
 conf="${XDG_CONFIG_HOME:-$HOME/.config}/adobewine/config"
