@@ -59,6 +59,7 @@ anything is sent. More help: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 | Lightroom Classic | Import, ratings, keywords, collections, Develop, AI masking, export to JPEG, TIFF, PSD and DNG |
 | Lightroom | Opens, edits and exports; less tested |
 | Bridge | Browsing, previews, metadata, batch rename, Camera Raw, Image Processor, contact sheets |
+| Animate | Drawing, shape tweens, video export through Media Encoder, SWF and HTML5 Canvas publishing; new, less tested |
 | Acrobat Pro | Read, comment, edit, combine, export to Word, Excel and PowerPoint, sign, OCR, print. Protected Mode is off |
 
 Details for each app: [docs/STATUS.md](docs/STATUS.md).
@@ -67,7 +68,7 @@ Details for each app: [docs/STATUS.md](docs/STATUS.md).
 
 - **You need your own Adobe subscription.** LinDobe contains no Adobe software and doesn't crack or bypass
   anything: you download Creative Cloud from Adobe and sign in normally.
-- **NVIDIA is the best-tested graphics card.** On Intel Iris Xe, Photoshop and Premiere pass our main tests, with Premiere rendering on the CPU. AMD has one tester so
+- **NVIDIA is the best-tested graphics card.** On Intel Iris Xe, Photoshop and Premiere pass our main tests, and Premiere renders on the Intel GPU through OpenCL (install Intel's OpenCL driver). AMD has one tester so
   far: Photoshop and Premiere work on an RX 7900 XTX, with AMD's OpenCL driver for Premiere. NVIDIA-only features (CUDA, NVENC) aren't available on AMD or
   Intel, just like on Windows.
 - **After Effects can use a lot of memory** while previewing Cinema 4D scenes. Turning off *Cache Frames When

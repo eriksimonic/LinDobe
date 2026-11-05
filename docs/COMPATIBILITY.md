@@ -131,5 +131,6 @@ XWayland is untested.
 The patches were developed against the 2026 releases: Photoshop 27.10, Illustrator
 30.8.2, Premiere Pro 26.5.2, Audition 26.5, Media Encoder 26.5.2, Creative Cloud
 desktop 6.10. Newer versions install through Creative Cloud as usual; please report when
-an update breaks something. Other Adobe apps (After Effects, InDesign, Lightroom
-Classic, Bridge) are untested apart from Bridge installing and opening.
+an update breaks something. After Effects, InDesign, Lightroom Classic, Lightroom,
+Bridge, Acrobat and Animate are less tested (see STATUS.md). Animate is 2024 (24.0), the version Creative Cloud
+offers.

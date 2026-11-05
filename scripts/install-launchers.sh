@@ -45,6 +45,7 @@ entry audition "Adobe Audition" "AudioVideo;Audio;AudioVideoEditing;" "audio/x-w
 entry encoder "Adobe Media Encoder" "AudioVideo;Video;" "" "adobe media encoder.exe" "$PF/$(latest "Adobe Media Encoder")/Adobe Media Encoder.exe"
 entry aftereffects "Adobe After Effects" "AudioVideo;Video;AudioVideoEditing;" "" "afterfx.exe" "$PF/$(latest "Adobe After Effects")/Support Files/AfterFX.exe"
 entry indesign "Adobe InDesign" "Graphics;Publishing;" "application/x-indesign;" "indesign.exe" "$PF/$(latest "Adobe InDesign")/InDesign.exe"
+entry animate "Adobe Animate" "Graphics;2DGraphics;VectorGraphics;" "" "animate.exe" "$PF/$(latest "Adobe Animate")/Animate.exe"
 entry bridge "Adobe Bridge" "Graphics;Viewer;" "" "adobe bridge.exe" "$PF/$(latest "Adobe Bridge")/Adobe Bridge.exe"
 entry lightroomclassic "Adobe Lightroom Classic" "Graphics;Photography;" "" "lightroom.exe" "$PF/Adobe Lightroom Classic/Lightroom.exe"
 entry lightroom "Adobe Lightroom" "Graphics;Photography;" "" "lightroom.exe" "$PF/Adobe Lightroom CC/lightroom.exe"
