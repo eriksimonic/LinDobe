@@ -1,0 +1,162 @@
+diff --git a/dlls/dxcore/Makefile.in b/dlls/dxcore/Makefile.in
+index 7c7e60f..d3409a2 100644
+--- a/dlls/dxcore/Makefile.in
++++ b/dlls/dxcore/Makefile.in
+@@ -1,5 +1,5 @@
+ MODULE  = dxcore.dll
+-IMPORTS = wined3d
++IMPORTS = wined3d setupapi advapi32
+ 
+ SOURCES = \
+ 	dxcore.c
+diff --git a/dlls/dxcore/dxcore.c b/dlls/dxcore/dxcore.c
+index 377a80b..8a32d6a 100644
+--- a/dlls/dxcore/dxcore.c
++++ b/dlls/dxcore/dxcore.c
+@@ -22,11 +22,17 @@
+ #include "initguid.h"
+ #include "dxcore.h"
+ #include "wine/wined3d.h"
++#include "winreg.h"
++#include "setupapi.h"
++#include "devguid.h"
++#include "devpkey.h"
+ 
+ #include "wine/debug.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(dxcore);
+ 
++DEFINE_DEVPROPKEY(DEVPROPKEY_GPU_LUID, 0x60b193cb, 0x5276, 0x4d0f, 0x96, 0xfc, 0xf1, 0x73, 0xab, 0xad, 0x3e, 0xc6, 2);
++
+ struct dxcore_adapter
+ {
+     IDXCoreAdapter IDXCoreAdapter_iface;
+@@ -525,12 +531,102 @@ static HRESULT dxcore_adapter_create(const struct wined3d_adapter *wined3d_adapt
+     return S_OK;
+ }
+ 
++/* The GPUs as win32u registers them (the display class devices: PCI ids, LUID, DriverDesc, DriverVersion, memory),
++ * the data WMI and SetupAPI report. wined3d's identifier is only a fallback: its card tables stop at old GPUs and,
++ * without a GL context (Mesa's EGL on another vendor's X server), it reports a default "Intel(R) HD Graphics 4000"
++ * with a 2013 driver, which Premiere Pro rejects as "Hardware out of date". */
++static void parse_pci_ids(const WCHAR *id, struct wined3d_adapter_identifier *ident)
++{
++    const WCHAR *p;
++    if ((p = wcsstr(id, L"VEN_"))) ident->vendor_id = wcstoul(p + 4, NULL, 16);
++    if ((p = wcsstr(id, L"DEV_"))) ident->device_id = wcstoul(p + 4, NULL, 16);
++    if ((p = wcsstr(id, L"SUBSYS_"))) ident->subsystem_id = wcstoul(p + 7, NULL, 16);
++    if ((p = wcsstr(id, L"REV_"))) ident->revision = wcstoul(p + 4, NULL, 16);
++}
++
++static BOOL registry_adapter(HDEVINFO set, SP_DEVINFO_DATA *dev, struct dxcore_adapter *adapter)
++{
++    struct wined3d_adapter_identifier *ident = &adapter->identifier;
++    WCHAR id[256], driver[128], desc[128], version[64], path[256];
++    unsigned int a = 0, b = 0, c = 0, d = 0;
++    MEMORYSTATUSEX mem = {.dwLength = sizeof(mem)};
++    DEVPROPTYPE type;
++    UINT64 luid, size;
++    DWORD len;
++    HKEY key;
++
++    if (!SetupDiGetDevicePropertyW(set, dev, &DEVPROPKEY_GPU_LUID, &type, (BYTE *)&luid, sizeof(luid), NULL, 0))
++        return FALSE;
++    if (!SetupDiGetDeviceInstanceIdW(set, dev, id, ARRAY_SIZE(id), NULL)) return FALSE;
++    if (!SetupDiGetDevicePropertyW(set, dev, &DEVPKEY_Device_Driver, &type, (BYTE *)driver, sizeof(driver), NULL, 0))
++        return FALSE;
++
++    memset(ident, 0, sizeof(*ident));
++    ident->description = adapter->driver_description;
++    ident->description_size = sizeof(adapter->driver_description);
++    memcpy(&ident->adapter_luid, &luid, sizeof(luid));
++    parse_pci_ids(id, ident);
++
++    swprintf(path, ARRAY_SIZE(path), L"System\\CurrentControlSet\\Control\\Class\\%s", driver);
++    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, path, 0, KEY_QUERY_VALUE, &key)) return FALSE;
++    len = sizeof(desc);
++    if (RegQueryValueExW(key, L"DriverDesc", NULL, NULL, (BYTE *)desc, &len)) desc[0] = 0;
++    len = sizeof(version);
++    if (!RegQueryValueExW(key, L"DriverVersion", NULL, NULL, (BYTE *)version, &len)
++            && swscanf(version, L"%u.%u.%u.%u", &a, &b, &c, &d) == 4)
++        ident->driver_version.QuadPart = (UINT64)a << 48 | (UINT64)b << 32 | (UINT64)c << 16 | d;
++    len = sizeof(size);
++    if (!RegQueryValueExW(key, L"HardwareInformation.qwMemorySize", NULL, NULL, (BYTE *)&size, &len))
++        ident->video_memory = size;
++    RegCloseKey(key);
++
++    WideCharToMultiByte(CP_ACP, 0, desc, -1, adapter->driver_description, sizeof(adapter->driver_description), NULL, NULL);
++    GlobalMemoryStatusEx(&mem);
++    ident->shared_system_memory = mem.ullTotalPhys / 2;
++    TRACE("%s: %04lx:%04lx %s, driver %s, luid %#I64x, memory %I64u MB.\n", debugstr_w(id), ident->vendor_id,
++            ident->device_id, debugstr_a(adapter->driver_description), debugstr_w(version), luid, ident->video_memory >> 20);
++    return TRUE;
++}
++
++static HRESULT get_registry_adapters(struct dxcore_adapter_list *list)
++{
++    SP_DEVINFO_DATA dev = {.cbSize = sizeof(dev)};
++    struct dxcore_adapter *adapter;
++    HDEVINFO set;
++    DWORD i;
++
++    set = SetupDiGetClassDevsW(&GUID_DEVCLASS_DISPLAY, NULL, NULL, DIGCF_PRESENT);
++    if (set == INVALID_HANDLE_VALUE) return E_FAIL;
++    for (i = 0; SetupDiEnumDeviceInfo(set, i, &dev); i++)
++    {
++        if (!(adapter = calloc(1, sizeof(*adapter)))) break;
++        adapter->IDXCoreAdapter_iface.lpVtbl = &dxcore_adapter_vtbl;
++        adapter->refcount = 1;
++        if (!registry_adapter(set, &dev, adapter) || !adapter->identifier.vendor_id)
++        {
++            free(adapter);
++            continue;
++        }
++        if (!(list->adapters = realloc(list->adapters, (list->adapter_count + 1) * sizeof(*list->adapters))))
++        {
++            free(adapter);
++            list->adapter_count = 0;
++            break;
++        }
++        list->adapters[list->adapter_count++] = adapter;
++    }
++    SetupDiDestroyDeviceInfoList(set);
++    return list->adapter_count ? S_OK : E_FAIL;
++}
++
+ static HRESULT get_adapters(struct dxcore_adapter_list *list)
+ {
+-    struct wined3d *wined3d = wined3d_create(0);
++    struct wined3d *wined3d;
+     HRESULT hr = S_OK;
+ 
+-    if (!wined3d)
++    if (SUCCEEDED(get_registry_adapters(list)))
++        return S_OK;
++    if (!(wined3d = wined3d_create(0)))
+         return E_FAIL;
+ 
+     if (!(list->adapter_count = wined3d_get_adapter_count(wined3d)))
+@@ -597,6 +693,23 @@ static HRESULT STDMETHODCALLTYPE dxcore_adapter_factory_GetAdapterByLuid(IDXCore
+ 
+     TRACE("iface %p, adapter_luid %p, riid %s, out %p.\n", iface, adapter_luid, debugstr_guid(riid), out);
+ 
++    {
++        struct dxcore_adapter_list reg = {0};
++        HRESULT found = E_INVALIDARG;
++
++        if (SUCCEEDED(get_registry_adapters(&reg)))
++        {
++            for (uint32_t i = 0; i < reg.adapter_count; ++i)
++            {
++                if (found == E_INVALIDARG && !memcmp(adapter_luid, &reg.adapters[i]->identifier.adapter_luid, sizeof(LUID)))
++                    found = IDXCoreAdapter_QueryInterface(&reg.adapters[i]->IDXCoreAdapter_iface, riid, out);
++                IDXCoreAdapter_Release(&reg.adapters[i]->IDXCoreAdapter_iface);
++            }
++            free(reg.adapters);
++            if (found != E_INVALIDARG) return found;
++        }
++    }
++
+     if (!(wined3d = wined3d_create(0)))
+         return E_FAIL;
+ 

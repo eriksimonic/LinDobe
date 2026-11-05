@@ -1,0 +1,141 @@
+diff --git a/dlls/opencl/Makefile.in b/dlls/opencl/Makefile.in
+index 69df0a3..c9afe0f 100644
+--- a/dlls/opencl/Makefile.in
++++ b/dlls/opencl/Makefile.in
+@@ -1,5 +1,6 @@
+ MODULE    = opencl.dll
+ UNIXLIB   = opencl.so
++IMPORTS   = dxguid uuid
+ UNIX_LIBS = $(OPENCL_LIBS)
+ 
+ SOURCES = \
+diff --git a/dlls/opencl/pe_wrappers.c b/dlls/opencl/pe_wrappers.c
+index aed8b7f..7b7a1fc 100644
+--- a/dlls/opencl/pe_wrappers.c
++++ b/dlls/opencl/pe_wrappers.c
+@@ -22,6 +22,8 @@
+ #include "opencl_types.h"
+ #include "unixlib.h"
+ #include "wine/wgl.h"
++#define COBJMACROS
++#include "dxgi.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(opencl);
+ 
+@@ -194,8 +196,70 @@ cl_int WINAPI clSetCommandQueueProperty( cl_command_queue command_queue, cl_comm
+ }
+ 
+ 
++/* cl_khr_d3d11_sharing, device query only. Adobe's Mercury engine looks the Intel device up from its D3D11 device and
++ * leaves the OpenCL device uninitialized when the lookup is missing ("Hardware out of date"). The D3D11 device under
++ * Wine is DXVK's, on the same GPU when only one GPU is visible, so the platform's GPU devices are the answer. Object
++ * sharing (clCreateFromD3D11*) is not provided. */
++/* PCI vendor of the adapter behind a D3D11 device (CL_D3D11_DEVICE_KHR) or DXGI adapter (CL_D3D11_DXGI_ADAPTER_KHR) */
++static UINT d3d11_vendor( cl_uint source, void *object )
++{
++    IDXGIAdapter *adapter = NULL;
++    IDXGIDevice *device;
++    DXGI_ADAPTER_DESC desc;
++    UINT vendor = 0;
++
++    if (!object) return 0;
++    if (source == 0x4019 /* CL_D3D11_DEVICE_KHR */)
++    {
++        if (FAILED(IUnknown_QueryInterface( (IUnknown *)object, &IID_IDXGIDevice, (void **)&device ))) return 0;
++        IDXGIDevice_GetAdapter( device, &adapter );
++        IDXGIDevice_Release( device );
++    }
++    else if (source == 0x401A /* CL_D3D11_DXGI_ADAPTER_KHR */)
++    {
++        if (FAILED(IUnknown_QueryInterface( (IUnknown *)object, &IID_IDXGIAdapter, (void **)&adapter ))) return 0;
++    }
++    if (!adapter) return 0;
++    if (SUCCEEDED(IDXGIAdapter_GetDesc( adapter, &desc ))) vendor = desc.VendorId;
++    IDXGIAdapter_Release( adapter );
++    return vendor;
++}
++
++static cl_int WINAPI get_device_ids_from_d3d11( cl_platform_id platform, cl_uint source, void *object, cl_uint set,
++        cl_uint num_entries, cl_device_id *devices, cl_uint *num_devices )
++{
++    struct clGetDeviceIDs_params params = { platform, CL_DEVICE_TYPE_GPU, 0, NULL, NULL };
++    cl_device_id all[16];
++    cl_uint count = 0, found = 0, i, id;
++    UINT vendor = d3d11_vendor( source, object );
++    cl_int ret;
++
++    TRACE( "(%p, %#x, %p, %#x, %u, %p, %p) vendor %04x\n", platform, source, object, set, num_entries, devices,
++           num_devices, vendor );
++    params.num_entries = ARRAY_SIZE(all);
++    params.devices = all;
++    params.num_devices = &count;
++    if ((ret = OPENCL_CALL( clGetDeviceIDs, &params ))) return ret;
++    /* only the devices on the D3D11 device's GPU: a laptop's other GPU can't share its resources */
++    for (i = 0; i < min( count, ARRAY_SIZE(all) ); i++)
++    {
++        struct clGetDeviceInfo_params info = { all[i], CL_DEVICE_VENDOR_ID, sizeof(id), &id, NULL };
++        if (vendor && (OPENCL_CALL( clGetDeviceInfo, &info ) || id != vendor)) continue;
++        if (devices && found < num_entries) devices[found] = all[i];
++        found++;
++    }
++    if (num_devices) *num_devices = found;
++    TRACE( "-> %u device(s)\n", found );
++    return found ? CL_SUCCESS : -1000 /* CL_DEVICE_NOT_FOUND */;
++}
++
+ void * WINAPI clGetExtensionFunctionAddressForPlatform( cl_platform_id platform, const char *func_name )
+ {
++    if (func_name && !strcmp( func_name, "clGetDeviceIDsFromD3D11KHR" ))
++    {
++        TRACE( "(%p, %s)\n", platform, debugstr_a(func_name) );
++        return get_device_ids_from_d3d11;
++    }
+     FIXME( "(%p, %s) stub!\n", platform, debugstr_a(func_name) );
+     return NULL;
+ }
+diff --git a/dlls/opencl/unix_wrappers.c b/dlls/opencl/unix_wrappers.c
+index 5967979..f8e4d20 100644
+--- a/dlls/opencl/unix_wrappers.c
++++ b/dlls/opencl/unix_wrappers.c
+@@ -35,12 +35,28 @@ NTSTATUS wrap_clBuildProgram( void *args )
+                            params->options, NULL, NULL );
+ }
+ 
++/* drop the D3D11 device property (cl_khr_d3d11_sharing, see clGetExtensionFunctionAddressForPlatform): the host
++ * driver doesn't know it */
++static const cl_context_properties *strip_d3d11( const cl_context_properties *props, cl_context_properties *buf, int max )
++{
++    int i = 0;
++    if (!props) return NULL;
++    for (; props[0] && i < max - 3; props += 2)
++    {
++        if (props[0] == 0x401D /* CL_CONTEXT_D3D11_DEVICE_KHR */) { TRACE( "dropping CL_CONTEXT_D3D11_DEVICE_KHR\n" ); continue; }
++        buf[i++] = props[0]; buf[i++] = props[1];
++    }
++    buf[i] = 0;
++    return buf;
++}
++
+ NTSTATUS wrap_clCreateContext( void *args )
+ {
+     struct clCreateContext_params *params = args;
++    cl_context_properties buf[64];
+ 
+     if (params->pfn_notify) FIXME( "notify callback not supported\n" );
+-    *params->__retval = clCreateContext( params->properties, params->num_devices, params->devices,
++    *params->__retval = clCreateContext( strip_d3d11( params->properties, buf, 64 ), params->num_devices, params->devices,
+                                          NULL, NULL, params->errcode_ret );
+     return STATUS_SUCCESS;
+ }
+@@ -48,9 +64,10 @@ NTSTATUS wrap_clCreateContext( void *args )
+ NTSTATUS wrap_clCreateContextFromType( void *args )
+ {
+     struct clCreateContextFromType_params *params = args;
++    cl_context_properties buf[64];
+ 
+     if (params->pfn_notify) FIXME( "notify callback not supported\n" );
+-    *params->__retval = clCreateContextFromType( params->properties, params->device_type,
++    *params->__retval = clCreateContextFromType( strip_d3d11( params->properties, buf, 64 ), params->device_type,
+                                                  NULL, NULL, params->errcode_ret );
+     return STATUS_SUCCESS;
+ }

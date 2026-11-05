@@ -83,3 +83,13 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
   46.4 s without), Premiere usage_ui 7/7 (playback's ruler drag once 9.53 s, then 4/4).
 - 0104 (2026-10-31): new (winex11: an owned popup with a dialog frame is managed; Photoshop's contextual task bar stayed
   above other applications).
+- 0127 (2026-11-05): new (opencl: clGetExtensionFunctionAddressForPlatform returns clGetDeviceIDsFromD3D11KHR, which
+  lists the platform's GPU devices on the D3D11 adapter's vendor; clCreateContext drops CL_CONTEXT_D3D11_DEVICE_KHR. No
+  object sharing). Premiere's Intel OpenCL path looks its device up this way.
+- 0128 (2026-11-05): new (dxcore: adapters from the GPUs Wine registers, with their name, PCI ids, LUID and driver
+  version, instead of wined3d's identifier, which said "Intel(R) HD Graphics 4000" with a 2013 driver when wined3d had
+  no GL; wined3d stays the fallback).
+- patches-deps/dxvk-3.1.1-intel-device-information-counter.patch (2026-11-05): DXVK's d3d11 offers Intel's
+  "Intel Device Information" counter (Intel GPUDetect protocol: Version 2, Size 24, GPU generation from the PCI id) on
+  Intel adapters. Premiere reads it and otherwise rejects Intel GPUs as "Hardware out of date". With 0127 and 0128,
+  Premiere renders with OpenCL on an Iris Xe (7/7 real-click tests).

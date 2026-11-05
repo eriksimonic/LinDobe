@@ -1,6 +1,7 @@
 #!/bin/bash
 # build-gpu-deps.sh [DEPS_DIR]: build the patched vkd3d-proton (d3d12core.dll) and nvcuda (nvcuda.dll) that
-# After Effects' viewers need (patches in patches-deps), into DEPS_DIR/adobewine-gpu/x64.
+# After Effects' viewers need, and DXVK's d3d11.dll with Intel's device information counter (Premiere's OpenCL
+# path on Intel GPUs), patches in patches-deps, into DEPS_DIR/adobewine-gpu/x64.
 # Needs git, python3 (meson and ninja go into a venv), mingw-w64, glslang and winegcc (Wine >= 10 headers).
 set -e
 HERE=$(cd "$(dirname "$0")/.." && pwd)
@@ -27,6 +28,18 @@ meson setup --reconfigure --cross-file "$V/build-win64.txt" --buildtype release 
 ninja -C "$V/build" >/dev/null
 cp "$V/build/libs/d3d12core/d3d12core.dll" "$OUT/"
 x86_64-w64-mingw32-strip "$OUT/d3d12core.dll"
+
+# DXVK 3.1.1 d3d11.dll: Intel's "Intel Device Information" counter (Premiere reads the GPU generation from it and
+# otherwise rejects Intel GPUs as "Hardware out of date")
+D=$SRC/dxvk-adobewine
+if [ ! -d "$D" ]; then
+  git clone -q --branch v3.1.1 --depth 1 https://github.com/doitsujin/dxvk.git "$D"
+  git -C "$D" submodule update -q --init --recursive --depth 1
+  git -C "$D" apply "$HERE"/patches-deps/dxvk-3.1.1-*.patch
+fi
+[ -d "$D/build.w64" ] || meson setup --cross-file "$D/build-win64.txt" --buildtype release --strip "$D/build.w64" "$D" >/dev/null
+ninja -C "$D/build.w64" src/d3d11/d3d11.dll >/dev/null
+x86_64-w64-mingw32-strip -o "$OUT/d3d11.dll" "$D/build.w64/src/d3d11/d3d11.dll"
 
 # nvcuda (SveSop/nvcuda, the CUDA bridge nvidia-libs ships)
 N=$SRC/nvcuda-adobewine

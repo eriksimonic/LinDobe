@@ -102,6 +102,7 @@ done
 GPU="$DEPS/adobewine-gpu/x64"
 [ -f "$GPU/d3d12core.dll" ] || GPU="$ADOBEWINE_SRC/lib/adobewine-gpu/x64"      # built by the package
 [ -f "$GPU/d3d12core.dll" ] && cp "$GPU/d3d12core.dll" "$SYS/"
+[ -f "$GPU/d3d11.dll" ] && cp "$GPU/d3d11.dll" "$SYS/"          # DXVK with Intel's device information counter
 if [ -f "$ADOBEWINE_SRC/lib/d3d12.dll" ]; then
   mv "$SYS/d3d12.dll" "$SYS/d3d12_vkd3d.dll"; cp "$ADOBEWINE_SRC/lib/d3d12.dll" "$SYS/d3d12.dll"
 elif command -v x86_64-w64-mingw32-gcc >/dev/null; then

@@ -1,0 +1,206 @@
+diff --git a/src/d3d11/d3d11_device.cpp b/src/d3d11/d3d11_device.cpp
+index 97df7a0..d1d241b 100644
+--- a/src/d3d11/d3d11_device.cpp
++++ b/src/d3d11/d3d11_device.cpp
+@@ -1275,10 +1275,54 @@ namespace dxvk {
+     const D3D11_COUNTER_DESC*         pCounterDesc,
+           ID3D11Counter**             ppCounter) {
+     InitReturnPtr(ppCounter);
+-    
++
++    if (pCounterDesc && pCounterDesc->Counter == D3D11_COUNTER_DEVICE_DEPENDENT_0 && GetIntelGpuArchitecture()) {
++      Logger::info(str::format("D3D11: Intel Device Information counter, architecture ", GetIntelGpuArchitecture()));
++      if (!ppCounter)
++        return S_FALSE;
++
++      D3D11_QUERY_DESC1 desc = { };
++      desc.Query = D3D11Query::IntelDeviceInfoQuery;
++      desc.ContextType = D3D11_CONTEXT_TYPE_ALL;
++
++      try {
++        // ID3D11Counter and ID3D11Query have the same vtable layout (ID3D11Asynchronous + GetDesc)
++        *ppCounter = reinterpret_cast<ID3D11Counter*>(static_cast<ID3D11Query*>(ref(new D3D11Query(this, desc))));
++        return S_OK;
++      } catch (const DxvkError& e) {
++        Logger::err(e.message());
++        return E_INVALIDARG;
++      }
++    }
++
+     Logger::err(str::format("D3D11: Unsupported counter: ", pCounterDesc->Counter));
+     return E_INVALIDARG;
+   }
++
++
++  uint32_t D3D11Device::GetIntelGpuArchitecture() {
++    // Intel's PRODUCT_FAMILY numbers (the GPUArchitecture field of the "Intel Device Information" counter, see
++    // Intel GPUDetect's INTEL_GPU_ARCHITECTURE), from the PCI device id. 0: not an Intel GPU we know.
++    const auto& props = m_dxvkDevice->properties().core.properties;
++    if (props.vendorID != 0x8086)
++      return 0;
++
++    uint32_t id = props.deviceID, hi = id & 0xff00;
++    if (hi == 0x9a00) return 0x21;                       // Tiger Lake LP (Iris Xe)
++    if (hi == 0x4c00) return 0x23;                       // Rocket Lake
++    if (id >= 0x46d0 && id <= 0x46df) return 0x26;       // Alder Lake N
++    if ((id >= 0x4680 && id <= 0x469f) || (id >= 0xa780 && id <= 0xa79f)) return 0x24;   // Alder/Raptor Lake S
++    if (hi == 0x4600 || hi == 0xa700) return 0x25;       // Alder/Raptor Lake P (Iris Xe)
++    if (hi == 0x4900) return 0x4ba;                      // DG1
++    if (hi == 0x5600) return 1270;                       // Arc Alchemist (DG2)
++    if (hi == 0x7d00) return (id == 0x7d67 || id == 0x7d51 || id == 0x7dd1 || id == 0x7d41) ? 1273 : 1272;   // Arrow / Meteor Lake
++    if (hi == 0xe200) return 1274;                       // Arc Battlemage
++    if (hi == 0x6400) return 1275;                       // Lunar Lake
++    if (hi == 0xb000) return 1300;                       // Panther Lake
++    if (hi == 0x8a00) return 0x1d;                       // Ice Lake LP
++    if (hi == 0x9b00 || hi == 0x3e00) return 0x14;       // Comet / Coffee Lake
++    return 0;
++  }
+   
+   
+   HRESULT STDMETHODCALLTYPE D3D11Device::CreateDeferredContext(
+@@ -1736,9 +1780,9 @@ namespace dxvk {
+ 
+ 
+   void STDMETHODCALLTYPE D3D11Device::CheckCounterInfo(D3D11_COUNTER_INFO* pCounterInfo) {
+-    // We basically don't support counters
+-    pCounterInfo->LastDeviceDependentCounter  = D3D11_COUNTER(0);
+-    pCounterInfo->NumSimultaneousCounters     = 0;
++    // We basically don't support counters, except Intel's device information counter
++    pCounterInfo->LastDeviceDependentCounter  = GetIntelGpuArchitecture() ? D3D11_COUNTER_DEVICE_DEPENDENT_0 : D3D11_COUNTER(0);
++    pCounterInfo->NumSimultaneousCounters     = GetIntelGpuArchitecture() ? 1 : 0;
+     pCounterInfo->NumDetectableParallelUnits  = 0;
+   }
+   
+@@ -1753,6 +1797,24 @@ namespace dxvk {
+           UINT*               pUnitsLength,
+           LPSTR               szDescription,
+           UINT*               pDescriptionLength) {
++    if (pDesc && pDesc->Counter == D3D11_COUNTER_DEVICE_DEPENDENT_0 && GetIntelGpuArchitecture()) {
++      // the D3D11 rule: a null string returns its length (with the terminator); a short buffer is an error
++      auto put = [] (LPSTR dst, UINT* len, const char* src) {
++        UINT need = UINT(std::strlen(src) + 1);
++        if (!len) return true;
++        if (dst) { if (*len < need) return false; std::memcpy(dst, src, need); }
++        *len = need;
++        return true;
++      };
++      if (pType) *pType = D3D11_COUNTER_TYPE_UINT32;
++      if (pActiveCounters) *pActiveCounters = 1;
++      if (!put(szName, pNameLength, "Intel Device Information")
++       || !put(szUnits, pUnitsLength, "Size 24")
++       || !put(szDescription, pDescriptionLength, "Version 2"))
++        return E_INVALIDARG;
++      return S_OK;
++    }
++
+     Logger::err("D3D11: Counters not supported");
+     return E_INVALIDARG;
+   }
+diff --git a/src/d3d11/d3d11_device.h b/src/d3d11/d3d11_device.h
+index 0b90bc7..31ce6f6 100644
+--- a/src/d3d11/d3d11_device.h
++++ b/src/d3d11/d3d11_device.h
+@@ -257,6 +257,8 @@ namespace dxvk {
+       const D3D11_QUERY_DESC*           pPredicateDesc,
+             ID3D11Predicate**           ppPredicate);
+     
++    uint32_t GetIntelGpuArchitecture();
++
+     HRESULT STDMETHODCALLTYPE CreateCounter(
+       const D3D11_COUNTER_DESC*         pCounterDesc,
+             ID3D11Counter**             ppCounter);
+diff --git a/src/d3d11/d3d11_query.cpp b/src/d3d11/d3d11_query.cpp
+index 440ccaa..23eb5c4 100644
+--- a/src/d3d11/d3d11_query.cpp
++++ b/src/d3d11/d3d11_query.cpp
+@@ -14,6 +14,15 @@ namespace dxvk {
+     Rc<DxvkDevice> dxvkDevice = m_parent->GetDXVKDevice();
+ 
+     switch (m_desc.Query) {
++      case IntelDeviceInfoQuery:
++        m_intelInfo.GPUArchitecture = m_parent->GetIntelGpuArchitecture();
++        m_intelInfo.GPUMaxFreq  = 1300;
++        m_intelInfo.GPUMinFreq  = 100;
++        m_intelInfo.EUCount     = 96;
++        m_intelInfo.PackageTDP  = 28;
++        m_intelInfo.MaxFillRate = 8;
++        break;
++
+       case D3D11_QUERY_EVENT:
+         m_event[0] = dxvkDevice->createGpuEvent();
+         break;
+@@ -137,6 +146,9 @@ namespace dxvk {
+   
+   UINT STDMETHODCALLTYPE D3D11Query::GetDataSize() {
+     switch (m_desc.Query) {
++      case IntelDeviceInfoQuery:
++        return sizeof(void*);
++
+       case D3D11_QUERY_EVENT:
+         return sizeof(BOOL);
+       
+@@ -188,6 +200,7 @@ namespace dxvk {
+   
+   void D3D11Query::Begin(DxvkContext* ctx) {
+     switch (m_desc.Query) {
++      case IntelDeviceInfoQuery:
+       case D3D11_QUERY_EVENT:
+       case D3D11_QUERY_TIMESTAMP:
+         break;
+@@ -204,6 +217,9 @@ namespace dxvk {
+   
+   void D3D11Query::End(DxvkContext* ctx) {
+     switch (m_desc.Query) {
++      case IntelDeviceInfoQuery:
++        break;
++
+       case D3D11_QUERY_EVENT:
+         ctx->signalGpuEvent(m_event[0]);
+         break;
+@@ -247,6 +263,13 @@ namespace dxvk {
+     if (m_state != D3D11_VK_QUERY_ENDED)
+       return DXGI_ERROR_INVALID_CALL;
+ 
++    // GPUDetect reads the counter once right after End: no GPU work, ready at once
++    if (m_desc.Query == IntelDeviceInfoQuery) {
++      if (pData != nullptr)
++        *static_cast<const void**>(pData) = &m_intelInfo;
++      return S_OK;
++    }
++
+     if (m_resetCtr != 0u)
+       return S_FALSE;
+ 
+diff --git a/src/d3d11/d3d11_query.h b/src/d3d11/d3d11_query.h
+index b990f2a..574a809 100644
+--- a/src/d3d11/d3d11_query.h
++++ b/src/d3d11/d3d11_query.h
+@@ -87,6 +87,19 @@ namespace dxvk {
+ 
+     static HRESULT ValidateDesc(const D3D11_QUERY_DESC1* pDesc);
+ 
++    /* Intel's "Intel Device Information" driver counter (Intel GPUDetect): an ID3D11Counter whose GetData returns
++     * a pointer to the data below. It shares ID3D11Query's vtable layout, so it is a query of this internal type. */
++    constexpr static D3D11_QUERY IntelDeviceInfoQuery = D3D11_QUERY(0x7f000001);
++
++    struct IntelDeviceInfo2 {
++      uint32_t GPUMaxFreq;
++      uint32_t GPUMinFreq;
++      uint32_t GPUArchitecture;
++      uint32_t EUCount;
++      uint32_t PackageTDP;
++      uint32_t MaxFillRate;
++    };
++
+     static ID3D11Predicate* AsPredicate(ID3D11Query* pQuery) {
+       // ID3D11Predicate and ID3D11Query have the same vtable. This
+       // saves us some headache in all query-related functions.
+@@ -115,6 +128,8 @@ namespace dxvk {
+ 
+     D3DDestructionNotifier m_destructionNotifier;
+ 
++    IntelDeviceInfo2 m_intelInfo = { };
++
+     UINT64 GetTimestampQueryFrequency() const;
+     
+   };
