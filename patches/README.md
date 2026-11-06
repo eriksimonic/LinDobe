@@ -93,6 +93,9 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
   too-short closing line takes the tangent from the segment before). Premiere's Save project dialog drew a full-height
   line at each pill button's right edge: the buttons end their arcs 2e-6 off the side lines, and the backwards "line"
   made a reversal join with a 25 unit extension. Repro tests/d2d/pill3.c.
+- 0130 (2026-11-06): new (d2d1: a WIC bitmap render target's texture is created with the bitmap's pixels). Premiere
+  draws each time ruler item with its own WIC render target on one bitmap; each started empty and wrote all of it back,
+  so only the last item survived: one marker, one time number, no ticks (issue #28). Repro tests/d2d/wicrt.c.
 - patches-deps/dxvk-3.1.1-intel-device-information-counter.patch (2026-11-05): DXVK's d3d11 offers Intel's
   "Intel Device Information" counter (Intel GPUDetect protocol: Version 2, Size 24, GPU generation from the PCI id) on
   Intel adapters. Premiere reads it and otherwise rejects Intel GPUs as "Hardware out of date". With 0127 and 0128,

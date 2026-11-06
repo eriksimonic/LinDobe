@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Premiere's time rulers show every marker and time number again.** With GPU-accelerated UI, the Timeline, Source and Program monitor rulers only showed the rightmost marker and time number, and the ticks disappeared when Time Ruler Numbers was on (#28). Premiere draws each ruler item separately onto one image, and Wine started each drawing from a blank image, erasing the ones before. Patch 0130 keeps what is already there.
+
 - **Premiere's Save project dialog no longer has lines through it.** Wine drew a full-height line at the right edge of each round button (Save, Don't Save, Cancel). The buttons' outlines have a side line a few millionths of a unit long that runs backwards, and Wine turned that into a long spike. Patch 0129 skips lines that short.
 
 - **Illustrator art round-trips with Premiere and After Effects.** An .ai file placed in a Premiere timeline opens in Illustrator with Edit > Edit Original (Ctrl+E), and Premiere shows the change after you save it in Illustrator. The same works from an After Effects comp, and a Photoshop file in an After Effects comp opens in Photoshop with Ctrl+E the same way. After Effects comps also render in Media Encoder through Composition > Add to Adobe Media Encoder Queue. Tested with real clicks, 3 of 3 each.

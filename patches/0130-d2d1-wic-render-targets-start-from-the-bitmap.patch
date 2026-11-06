@@ -1,0 +1,49 @@
+d2d1: WIC bitmap render targets start from the bitmap's pixels.
+
+A WIC bitmap render target drew into a new, empty texture and wrote all of it back to the bitmap at EndDraw, so a
+render target made on a bitmap that an earlier one drew into erased that drawing. On Windows the drawing goes onto
+what the bitmap holds. Premiere draws each time ruler item (ticks, each time number, each marker) with its own render
+target on one bitmap: only the rightmost marker and time number showed, and the ticks vanished with Time Ruler
+Numbers on (LinDobe issue #28). The texture is now created with the bitmap's pixels. Repro: wine/tests/d2d/wicrt.c.
+
+--- a/dlls/d2d1/wic_render_target.c
++++ b/dlls/d2d1/wic_render_target.c
+@@ -188,7 +188,9 @@
+ {
+     D2D1_RENDER_TARGET_PROPERTIES rt_desc;
+     D3D10_TEXTURE2D_DESC texture_desc;
++    D3D10_SUBRESOURCE_DATA initial;
+     WICPixelFormatGUID bitmap_format;
++    BYTE *pixels = NULL;
+     ID3D10Texture2D *texture;
+     IDXGIDevice *dxgi_device;
+     ID2D1Device *device;
+@@ -241,7 +243,27 @@
+     texture_desc.MiscFlags = desc->usage & D2D1_RENDER_TARGET_USAGE_GDI_COMPATIBLE ?
+             D3D10_RESOURCE_MISC_GDI_COMPATIBLE : 0;
+ 
+-    if (FAILED(hr = ID3D10Device1_CreateTexture2D(d3d_device, &texture_desc, NULL, &texture)))
++    /* Draws go onto what the bitmap already holds, as on Windows: a new render target on a bitmap that an
++     * earlier one drew into must not start empty, or present() writes only the last drawing back (Premiere
++     * draws each time ruler item with its own render target on one bitmap). */
++    initial.SysMemPitch = render_target->bpp * render_target->width;
++    initial.SysMemSlicePitch = 0;
++    if ((initial.pSysMem = pixels = malloc(initial.SysMemPitch * render_target->height)))
++    {
++        WICRect rect = {0, 0, render_target->width, render_target->height};
++
++        if (FAILED(IWICBitmap_CopyPixels(bitmap, &rect, initial.SysMemPitch,
++                initial.SysMemPitch * render_target->height, pixels)))
++        {
++            WARN("Failed to read the bitmap's pixels.\n");
++            free(pixels);
++            initial.pSysMem = pixels = NULL;
++        }
++    }
++
++    hr = ID3D10Device1_CreateTexture2D(d3d_device, &texture_desc, pixels ? &initial : NULL, &texture);
++    free(pixels);
++    if (FAILED(hr))
+     {
+         WARN("Failed to create texture, hr %#lx.\n", hr);
+         return hr;
