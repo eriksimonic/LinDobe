@@ -1,0 +1,57 @@
+d2d1: Skip outline lines too short to have a direction.
+
+Adobe's pill buttons end their arcs about 2e-6 off the side lines, so the closing "line" of each side runs backwards.
+d2d_geometry_add_figure_outline() turned that into a reversal join, whose 25 unit extension drew a full-height
+vertical line at each button's right edge in Premiere's Save project dialog. Lines shorter than 1e-4 units now add
+no segment and no join and keep the incoming tangent; a closed figure whose closing line is that short takes the
+tangent from the segment before it. Repro: wine/tests/d2d/pill3.c.
+
+--- a/dlls/d2d1/geometry.c
++++ b/dlls/d2d1/geometry.c
+@@ -3170,6 +3170,11 @@
+     return TRUE;
+ }
+ 
++static BOOL d2d_outline_segment_is_degenerate(const D2D1_POINT_2F *p0, const D2D1_POINT_2F *p1)
++{
++    return fabsf(p1->x - p0->x) < 1e-4f && fabsf(p1->y - p0->y) < 1e-4f;
++}
++
+ static BOOL d2d_geometry_add_figure_outline(struct d2d_geometry *geometry,
+         struct d2d_figure *figure, D2D1_FIGURE_END figure_end)
+ {
+@@ -3191,7 +3196,17 @@
+         if (d2d_vertex_type_is_bezier(figure->vertex_types[vertex_count - 1]))
+             prev = &figure->bezier_controls[figure->bezier_control_count - 1];
+         else
++        {
+             prev = &figure->vertices[vertex_count - 1];
++            /* a closing line too short to have a direction: take the one before it */
++            if (vertex_count > 1 && d2d_outline_segment_is_degenerate(prev, p0))
++            {
++                if (d2d_vertex_type_is_bezier(figure->vertex_types[vertex_count - 2]))
++                    prev = &figure->bezier_controls[figure->bezier_control_count - 1];
++                else
++                    prev = &figure->vertices[vertex_count - 2];
++            }
++        }
+     }
+     else
+     {
+@@ -3228,6 +3243,16 @@
+                 next = p1 = &figure->vertices[0];
+             else
+                 next = p1 = &figure->vertices[i + 1];
++
++            /* A line too short to have a direction (Adobe's pill buttons end their arcs 2e-6 off the
++             * side lines, so the "line" runs backwards) would make a reversal join, and with it a
++             * long spike: a full-height line through Premiere's Save project dialog. Skip it, keep
++             * the incoming tangent. */
++            if (d2d_outline_segment_is_degenerate(p0, p1))
++            {
++                p0 = p1;
++                continue;
++            }
+             next_prev = p0;
+ 
+             if (!d2d_geometry_outline_add_line_segment(geometry, p0, p1))
