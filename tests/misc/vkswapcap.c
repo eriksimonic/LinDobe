@@ -1,13 +1,14 @@
 /* vkswapcap.c: native Linux check for swapchurn's cap (no Wine, no DXVK): how many live VkSwapchainKHR, each on its
  * own XCB window, one VkDevice, before vkCreateSwapchainKHR fails. Under Wine + DXVK the 256th fails with
  * VK_ERROR_INITIALIZATION_FAILED (Audition's long-session hang).
- * Build: cc -O2 -o vkswapcap vkswapcap.c -lvulkan -lxcb      Usage: DISPLAY=:1 DEV=<gpu index> ./vkswapcap [count, default 300]
+ * Build: cc -O2 -o vkswapcap vkswapcap.c -lvulkan -lxcb -lxcb-shape      Usage: DISPLAY=:1 DEV=<gpu index> ./vkswapcap [count, default 300]
  * ORPHAN=1 presents, destroys the window and keeps the swapchain (DXVK then lost the device);
  * ORPHAN=2 reparents it to an unmapped dummy window instead, as Wine does when the HWND is destroyed
  * DROP=1 destroys each swapchain and keeps its surface: is the cap on surfaces or on swapchains? */
 #define VK_USE_PLATFORM_XCB_KHR
 #include <vulkan/vulkan.h>
 #include <xcb/xcb.h>
+#include <xcb/shape.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -74,6 +75,11 @@ int main(int argc, char **argv)
                     xcb_create_window(c, XCB_COPY_FROM_PARENT, dummy, scr->root, -1, -1, 1, 1, 0,
                                       XCB_WINDOW_CLASS_INPUT_OUTPUT, scr->root_visual,
                                       getenv("MAPPED") ? XCB_CW_OVERRIDE_REDIRECT : 0, &ovr);
+                    if (getenv("SHAPE"))   /* SHAPE=1: empty bounding and input shapes, as Wine's dummy parent */
+                    {
+                        xcb_shape_rectangles(c, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_BOUNDING, 0, dummy, 0, 0, 0, NULL);
+                        xcb_shape_rectangles(c, XCB_SHAPE_SO_SET, XCB_SHAPE_SK_INPUT, 0, dummy, 0, 0, 0, NULL);
+                    }
                     if (getenv("MAPPED")) xcb_map_window(c, dummy);
                 }
                 if (getenv("IDLE")) vkQueueWaitIdle(q);   /* IDLE=1: no present in flight at the reparent */
