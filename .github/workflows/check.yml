@@ -16,6 +16,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: sudo apt-get install -y shellcheck python3-pil
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck python3-pil   # the runner's package list goes stale (404s)
       - run: shellcheck -S error bin/adobewine bin/env.sh scripts/*.sh
       - run: /usr/bin/python3 -B -m unittest discover -s tests/launcher-icons -v
