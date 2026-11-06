@@ -1,0 +1,36 @@
+comctl32: Themed buttons paint through a paint buffer, as on Windows.
+
+Lightroom Classic subclasses group boxes, and their WM_ERASEBKGND handler calls ReleaseDC(groupbox, hdc) on the DC it
+is given. A themed radio button inside the group box draws its background with DrawThemeParentBackground, which sends
+that WM_ERASEBKGND. Wine passed the radio's own BeginPaint DC, the release disabled it, and the radio buttons of "Edit
+Photo with Adobe Photoshop" (Photo > Edit In, Ctrl+E) never showed, leaving only their grey descriptions. On Windows 11
+the parent gets a memory DC owned by no window (the button paints into a paint buffer), ReleaseDC on it returns 0, and
+the radios draw; Windows does release another window's paint DC, so ReleaseDC itself is not the difference. Themed
+buttons now paint between BeginBufferedPaint and EndBufferedPaint in WM_PAINT. Repro: wine/tests/paint/radiodc.c
+(Windows 11: 0 fails; Wine before: 1).
+
+--- a/dlls/comctl32_v6/button.c
++++ b/dlls/comctl32_v6/button.c
+@@ -562,7 +562,22 @@
+             int drawState = get_draw_state(infoPtr);
+             UINT dtflags = BUTTON_BStoDT(style, GetWindowLongW(hWnd, GWL_EXSTYLE));
+ 
++            HPAINTBUFFER buffer = NULL;
++            HDC paint_dc = hdc;
++            RECT client;
++
++            /* Windows paints a themed button into a paint buffer: the parent's WM_ERASEBKGND, sent by
++             * DrawThemeParentBackground, gets a memory DC, not the button's paint DC. Lightroom Classic's group
++             * boxes call ReleaseDC on the DC they get there, which must not take the paint DC away. */
++            GetClientRect(hWnd, &client);
++            if (!wParam && (buffer = BeginBufferedPaint(hdc, &client, BPBF_COMPATIBLEBITMAP, NULL, &paint_dc)))
++                hdc = paint_dc;
+             btnThemedPaintFunc[btn_type](theme, infoPtr, hdc, drawState, dtflags, infoPtr->state & BST_FOCUS);
++            if (buffer)
++            {
++                EndBufferedPaint(buffer, TRUE);
++                hdc = ps.hdc;
++            }
+         }
+         else if (btnPaintFunc[btn_type])
+         {

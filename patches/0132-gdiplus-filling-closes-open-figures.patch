@@ -1,0 +1,21 @@
+gdiplus: Filling closes every figure, also an open one followed by another.
+
+The span code behind software fills added a figure's closing edge only when the figure was explicitly closed or was
+the last one of the path. An open figure followed by another left an odd number of edges on its scanlines, and Wine
+stopped on the assertion "edge[0].y == edge[1].y" in edge_list_to_spans_alternate: Lightroom Classic's Photo > Edit
+In > Open as Layers / Open as Smart Object in Photoshop ended in "Assertion failed" (Wine C++ Runtime Library). On
+Windows the fill closes every figure. Repro: wine/tests/gdiplus/openfig.c.
+
+--- a/dlls/gdiplus/region.c
++++ b/dlls/gdiplus/region.c
+@@ -1194,7 +1194,9 @@
+         {
+             stat = line_to_edge_list(path->pathdata.Points[i-1], path->pathdata.Points[i], bounds, edges);
+ 
+-            if (stat == Ok && ((type & PathPointTypeCloseSubpath) || i == path->pathdata.Count - 1))
++            /* filling closes every figure: an open one ends where the next figure starts */
++            if (stat == Ok && ((type & PathPointTypeCloseSubpath) || i == path->pathdata.Count - 1 ||
++                               (path->pathdata.Types[i + 1] & PathPointTypePathTypeMask) == PathPointTypeStart))
+                 stat = line_to_edge_list(path->pathdata.Points[i], path->pathdata.Points[subpath_start], bounds, edges);
+         }
+     }

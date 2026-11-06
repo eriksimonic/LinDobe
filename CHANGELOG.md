@@ -4,7 +4,9 @@
 
 - **Bridge opens files in Photoshop.** Select a PSD in Bridge and press Enter: it opens in Photoshop, and after you save there Bridge shows the updated thumbnail. Tested with real keys, 3 of 3.
 
-- **Lightroom Classic's Edit in Photoshop works, and its dialog shows its choices.** Photo > Edit In > Edit in Adobe Photoshop (Ctrl+E) opens the photo in Photoshop, and after you save there Lightroom adds the edited copy and shows the change. The "Edit Photo with Adobe Photoshop" dialog used to show only grey descriptions, with no buttons to pick "Edit a Copy with Lightroom Adjustments", "Edit a Copy" or "Edit Original". Lightroom hands back a drawing surface that belongs to the buttons while they are still drawing, and Wine let go of it where Windows keeps it. Patch 0131. Tested with real clicks, 3 of 3.
+- **Lightroom Classic no longer crashes on Open as Layers in Photoshop.** Photo > Edit In > Open as Layers in Photoshop ended in an "Assertion failed" message and Adobe's error report. Lightroom fills a shape made of several outlines, one left open, and Wine's filling code only closed the last one. Patch 0132.
+
+- **Lightroom Classic's Edit in Photoshop works, and its dialog shows its choices.** Photo > Edit In > Edit in Adobe Photoshop (Ctrl+E) opens the photo in Photoshop, and after you save there Lightroom adds the edited copy and shows the change. The "Edit Photo with Adobe Photoshop" dialog used to show only grey descriptions, with no buttons to pick "Edit a Copy with Lightroom Adjustments", "Edit a Copy" or "Edit Original". Lightroom gives back the drawing surface the buttons hand it while they draw. On Windows the buttons draw into a private buffer, so nothing is lost; Wine handed over the buttons' own surface. Wine now draws themed buttons through a buffer too, checked against Windows 11. Patch 0131. Tested with real clicks, 3 of 3.
 
 - **Photoshop and Illustrator files placed in InDesign round-trip with Edit Original.** Select the placed image, choose Edit > Edit Original, change it in Photoshop or Illustrator and save, and InDesign updates the link and shows the change when you switch back. Tested with real clicks, 3 of 3 each.
 
