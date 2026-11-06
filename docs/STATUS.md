@@ -112,7 +112,7 @@ Real mouse and keyboard input on a hidden screen; outputs checked with ffprobe a
 | 1 | Install, launch | Creative Cloud > Apps > Animate > Install | opens | PASS 2026-11-05: 2.8 GB; opens when the install ends. On the first start Home stays empty until Ctrl+N shows "New to Animate?"; after No, Home draws |
 | 2 | New document, draw | Ctrl+N, HD 1280x720 Create, rectangle tool (R) dragged | shape on the stage | PASS: full workspace (tools, timeline, properties); the dragged area fills with the fill colour |
 | 3 | Shape tween | keyframe at 30 (F6), shape dragged, Insert > Create Shape Tween | in-between frames | PASS: frame 16 shows the shape half way |
-| 4 | Export video | File > Export > Export Video/Media (H.264, Media Encoder) | MP4 with the motion | PASS: 1280x720, 30 frames, 1.0 s; the shape moves x 188 -> 760. The first Export Video/Media after a start does nothing; choose it again |
+| 4 | Export video | File > Export > Export Video/Media (H.264, Media Encoder) | MP4 with the motion | PASS: 1280x720, 30 frames, 1.0 s; the shape moves x 188 -> 760. Export Video/Media sometimes does nothing (most often on an unsaved document); save and choose it again |
 | 5 | Publish SWF | Alt+Shift+F12 | valid SWF | PASS: compressed SWF, 30 fps, 30 frames |
 | 6 | Test Movie | Ctrl+Enter | plays | PASS: the tween plays and loops in the test window |
 | 7 | HTML5 Canvas | File > Convert To > HTML5 Canvas, publish | HTML + JS | PASS: 1280x720 stage, the tween's 29 steps in the JavaScript |
