@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Audition no longer freezes after a long session on NVIDIA.** After an hour or so of work, Audition could stop responding at a dialog, often a Save As. Audition keeps a drawing surface for every panel it has shown, about 250 in a long session, and NVIDIA's Linux driver refuses the 253rd (Windows has no such limit). Our DXVK now gives up the surfaces of panels that are not on screen past 192 and makes them again when the panel comes back. The full Audition test suite now passes three times in a row in one session, 60 of 60; before, the third round failed. Comes with `scripts/build-gpu-deps.sh` (the AUR package runs it); rerun `adobewine setup` after updating.
+
 - **Bridge opens files in Photoshop.** Select a PSD in Bridge and press Enter: it opens in Photoshop, and after you save there Bridge shows the updated thumbnail. Tested with real keys, 3 of 3.
 
 - **Tooltips no longer get stuck on screen in Photoshop and Illustrator.** Some tooltips stayed visible after the pointer moved away, most noticeably on Hyprland (#29). Patch 0133, checked against Windows 11. Contributed in #31.

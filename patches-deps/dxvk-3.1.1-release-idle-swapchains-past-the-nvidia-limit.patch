@@ -1,0 +1,174 @@
+diff --git a/src/dxvk/dxvk_presenter.cpp b/src/dxvk/dxvk_presenter.cpp
+index f93ae8d..755073c 100644
+--- a/src/dxvk/dxvk_presenter.cpp
++++ b/src/dxvk/dxvk_presenter.cpp
+@@ -7,6 +7,74 @@
+ 
+ namespace dxvk {
+ 
++  // AdobeWine: the NVIDIA Linux driver refuses a process's 253rd live VkSwapchainKHR with
++  // VK_ERROR_INITIALIZATION_FAILED (tests/misc/vkswapcap.c, no Wine involved; surfaces alone are not
++  // limited, Intel takes 300+). Windows has no such limit, and Adobe Audition keeps ~250 DXGI swapchains alive in a
++  // long session (one per dvaui panel it ever showed); the failed creation then ended in a device loss and a hang.
++  // So all presenters are listed, live swapchains are counted, and above the limit (DXVK_SWAPCHAIN_LIMIT, default
++  // 192) or after a refusal the least recently used idle presenters destroy their swapchain; they recreate it on
++  // their next acquire, the same path a minimised window takes.
++  static dxvk::mutex             s_presenterMutex;
++  static std::vector<Presenter*> s_presenters;
++  static std::atomic<uint32_t>   s_liveSwapchains = { 0u };
++
++  static uint32_t swapchainLimit() {
++    static const uint32_t limit = [] {
++      std::string v = env::getEnvVar("DXVK_SWAPCHAIN_LIMIT");
++      return v.empty() ? 192u : uint32_t(std::max(8, std::atoi(v.c_str())));
++    } ();
++    return limit;
++  }
++
++
++  void Presenter::registerPresenter(Presenter* presenter, bool add) {
++    std::lock_guard lock(s_presenterMutex);
++
++    if (add)
++      s_presenters.push_back(presenter);
++    else
++      s_presenters.erase(std::remove(s_presenters.begin(), s_presenters.end(), presenter), s_presenters.end());
++  }
++
++
++  uint32_t Presenter::evictIdleSwapchains(Presenter* self, uint32_t count) {
++    std::lock_guard lock(s_presenterMutex);
++
++    std::vector<Presenter*> idle;
++
++    for (auto p : s_presenters) {
++      if (p != self && p->m_device == self->m_device)
++        idle.push_back(p);
++    }
++
++    std::sort(idle.begin(), idle.end(), [] (const Presenter* a, const Presenter* b) {
++      return a->m_lastUsed < b->m_lastUsed;
++    });
++
++    auto now = high_resolution_clock::now();
++    uint32_t evicted = 0u;
++
++    for (auto p : idle) {
++      if (evicted >= count)
++        break;
++
++      // Never wait for another presenter: one that is busy is not idle
++      std::unique_lock other(p->m_surfaceMutex, std::try_to_lock);
++
++      if (!other.owns_lock() || !p->m_swapchain || p->m_presentPending
++       || now - p->m_lastUsed < std::chrono::milliseconds(500))
++        continue;
++
++      p->destroySwapchain();
++      evicted += 1u;
++    }
++
++    if (evicted)
++      Logger::info(str::format("Presenter: released ", evicted, " idle swapchains, ", s_liveSwapchains.load(), " live"));
++
++    return evicted;
++  }
++
+   const std::array<std::pair<VkColorSpaceKHR, VkColorSpaceKHR>, 2> Presenter::s_colorSpaceFallbacks = {{
+     { VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT, VK_COLOR_SPACE_HDR10_ST2084_EXT },
+ 
+@@ -48,10 +116,14 @@ namespace dxvk {
+     // the present fence if presentation is queued but fails.
+     // TODO Remove this hack when this gets fixed in stable SteamOS.
+     m_hasGamescopeFenceSignalBug = env::getEnvVar("ENABLE_GAMESCOPE_WSI") == "1";
++
++    registerPresenter(this, true);
+   }
+ 
+   
+   Presenter::~Presenter() {
++    registerPresenter(this, false);
++
+     destroySwapchain();
+     destroySurface();
+     destroyLatencySemaphore();
+@@ -92,6 +164,8 @@ namespace dxvk {
+     if (status < 0)
+       return status;
+ 
++    m_lastUsed = high_resolution_clock::now();
++
+     // Ensure that the swap chain gets recreated if it is dirty
+     bool hasSwapchain = m_swapchain != VK_NULL_HANDLE;
+ 
+@@ -783,10 +857,23 @@ namespace dxvk {
+       "\n  Buffer size:  ", swapInfo.imageExtent.width, "x", swapInfo.imageExtent.height,
+       "\n  Image count:  ", swapInfo.minImageCount));
+     
+-    if ((status = m_vkd->vkCreateSwapchainKHR(m_vkd->device(), &swapInfo, nullptr, &m_swapchain))) {
++    if (s_liveSwapchains.load() >= swapchainLimit())
++      evictIdleSwapchains(this, 16u);
++
++    status = m_vkd->vkCreateSwapchainKHR(m_vkd->device(), &swapInfo, nullptr, &m_swapchain);
++
++    if (status == VK_ERROR_INITIALIZATION_FAILED && evictIdleSwapchains(this, 16u)) {
++      m_swapchain = VK_NULL_HANDLE;
++      status = m_vkd->vkCreateSwapchainKHR(m_vkd->device(), &swapInfo, nullptr, &m_swapchain);
++    }
++
++    if (status) {
++      m_swapchain = VK_NULL_HANDLE;
+       Logger::err(str::format("Presenter: Failed to create Vulkan swapchain: ", status));
+       return status;
+     }
++
++    s_liveSwapchains += 1u;
+     
+     // Import actual swap chain images
+     std::vector<VkImage> images;
+@@ -1244,8 +1331,10 @@ namespace dxvk {
+     }
+ 
+     // The conditional is here because some third party layers don't properly handle null swapchains
+-    if (m_swapchain)
++    if (m_swapchain) {
+       m_vkd->vkDestroySwapchainKHR(m_vkd->device(), m_swapchain, nullptr);
++      s_liveSwapchains -= 1u;
++    }
+ 
+     m_images.clear();
+     m_semaphores.clear();
+diff --git a/src/dxvk/dxvk_presenter.h b/src/dxvk/dxvk_presenter.h
+index f4b8a0c..940f2c4 100644
+--- a/src/dxvk/dxvk_presenter.h
++++ b/src/dxvk/dxvk_presenter.h
+@@ -11,6 +11,7 @@
+ #include "../util/util_fps_limiter.h"
+ #include "../util/util_math.h"
+ #include "../util/util_string.h"
++#include "../util/util_time.h"
+ 
+ #include "../util/sync/sync_signal.h"
+ 
+@@ -305,6 +306,10 @@ namespace dxvk {
+ 
+     VkResult                    m_acquireStatus = VK_NOT_READY;
+     bool                        m_presentPending = false;
++
++    // AdobeWine: last acquire, so that the least recently used idle
++    // presenters can give up their Vulkan swapchain (see evictIdleSwapchains)
++    high_resolution_clock::time_point m_lastUsed = high_resolution_clock::now();
+     bool                        m_presentRepaint = false;
+ 
+     std::optional<VkHdrMetadataEXT> m_hdrMetadata;
+@@ -340,6 +345,10 @@ namespace dxvk {
+ 
+     VkResult createSwapChain();
+ 
++    static uint32_t evictIdleSwapchains(Presenter* self, uint32_t count);
++
++    static void registerPresenter(Presenter* presenter, bool add);
++
+     VkResult getSupportedFormats(
+             std::vector<VkSurfaceFormatKHR>& formats) const;
+     
