@@ -103,8 +103,8 @@ Dates after M2 depend on what the checklists show.
    0072-0074, 0077, 0078); the close button.
 5. **Memory:** Illustrator on 16 GB machines.
 6. ~~**HiDPI** scaling by default~~ done: `adobewine setup` follows the desktop's scale.
-7. ~~**Pen pressure** under XWayland~~ done in Wine itself (patch 0075): Photoshop (with
-   `UseSystemStylus 0`), Illustrator and After Effects follow the pen's pressure; InDesign and
+7. ~~**Pen pressure** under XWayland~~ done in Wine itself (patch 0075): Photoshop (the launcher
+   sets `UseSystemStylus 0`, from Neutron), Illustrator and After Effects follow the pen's pressure; InDesign and
    Premiere get it as a pen. Thanks to NickPittas for the analysis in [#13](../../../issues/13);
    a pressure curve option like his `XWINTAB_PRESSURE_GAMMA` could follow.
 

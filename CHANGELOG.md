@@ -4,6 +4,8 @@
 
 - **Bridge opens files in Photoshop.** Select a PSD in Bridge and press Enter: it opens in Photoshop, and after you save there Bridge shows the updated thumbnail. Tested with real keys, 3 of 3.
 
+- **Pen pressure in Photoshop without editing a settings file.** `adobewine photoshop` now adds `UseSystemStylus 0` to Photoshop's PSUserConfig.txt (unless you have your own line), so Photoshop reads the pen through WinTab, which carries pressure under Wine, instead of Windows Ink. From Neutron's launcher, where it was measured on a Cintiq 22HD; thanks to the Neutron project.
+
 - **Lightroom Classic and Bridge send photos to Photoshop as layers and Smart Objects.** In Lightroom, Photo > Edit In > Open as Smart Object in Photoshop and Open as Layers in Photoshop work, and in Bridge, Tools > Photoshop > Load Files into Photoshop Layers builds one document with a layer per file. Tested with real clicks, 3 of 3 each.
 
 - **Lightroom Classic no longer crashes on Open as Layers in Photoshop.** Photo > Edit In > Open as Layers in Photoshop ended in an "Assertion failed" message and Adobe's error report. Lightroom fills a shape made of several outlines, one left open, and Wine's filling code only closed the last one. Patch 0132.

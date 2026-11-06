@@ -24,9 +24,22 @@ use_ie_licensing() {  # Adobe's Chromium licensing window draws nothing under Wi
   done
   return $r
 }
+photoshop_wintab() {  # Photoshop reads a pen through WinTab (pressure) only with "UseSystemStylus 0"; with Windows
+  # Ink, its default, a pen under Wine draws without pressure. Added unless the user has their own line. From Neutron
+  # (ensure_photoshop_wintab, LGPL-2.1), measured there on a Cintiq 22HD.
+  local name="$1" u f
+  for u in "$WINEPREFIX/drive_c/users/"*/; do
+    [ "$(basename "$u")" = Public ] && continue
+    f="$u/AppData/Roaming/Adobe/$name/$name Settings/PSUserConfig.txt"
+    grep -qiE '^[[:space:]]*UseSystemStylus\b' "$f" 2>/dev/null && continue
+    mkdir -p "$(dirname "$f")" || continue
+    { [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ] && printf '\r\n'
+      printf '# LinDobe: read the pen through WinTab (pressure, tilt, eraser)\r\nUseSystemStylus 0\r\n'; } >> "$f"
+  done
+}
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 case "$cmd" in
-  photoshop)   exe="$P\\$(latest "Adobe Photoshop")\\Photoshop.exe" ;;
+  photoshop)   exe="$P\\$(latest "Adobe Photoshop")\\Photoshop.exe"; photoshop_wintab "$(latest "Adobe Photoshop")" ;;
   illustrator) exe="$P\\$(latest "Adobe Illustrator")\\Support Files\\Contents\\Windows\\Illustrator.exe" ;;
   premiere)    exe="$P\\$(latest "Adobe Premiere Pro")\\Adobe Premiere Pro.exe" ;;
   audition)    exe="$P\\$(latest "Adobe Audition")\\Adobe Audition.exe" ;;
