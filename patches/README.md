@@ -108,6 +108,11 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
   Edit In > Open as Layers in Photoshop ended in "Assertion failed" and Adobe's error report. repro tests/gdiplus/openfig.c:
   0 fails (assert before); Wine's gdiplus tests graphicspath 1195, region 6042, graphics 5913: 0 failures before and
   after.
+- 0133 (2026-11-06): new (comctl32: hide a tracking tooltip when its tool is deleted). Photoshop and Illustrator
+  delete a tracked tool before turning tracking off; 11.20 clears the tracked index on delete, so the later
+  TTM_TRACKACTIVATE FALSE no longer hid the tooltip and it stayed on screen (#29). Contributed in #31. Its
+  tests/tooltips/tracking-delete.c passes on Windows 11 (comctl32 5 and 6), fails on Wine before, passes after;
+  Wine's tooltips conformance tests unchanged (1480).
 - patches-deps/dxvk-3.1.1-intel-device-information-counter.patch (2026-11-05): DXVK's d3d11 offers Intel's
   "Intel Device Information" counter (Intel GPUDetect protocol: Version 2, Size 24, GPU generation from the PCI id) on
   Intel adapters. Premiere reads it and otherwise rejects Intel GPUs as "Hardware out of date". With 0127 and 0128,

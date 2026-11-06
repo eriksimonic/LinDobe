@@ -119,4 +119,4 @@ to WineHQ; help with that is very welcome.
 | 0119 | win32u | Text widths match what is drawn for fonts without anti-aliasing, so message boxes no longer cut off their last letters. By nvb-uy |
 | 0120 | comdlg32 | Extra buttons in file dialogs are as wide as their label ("Open from Adobe cloud storage"). By nvb-uy |
 | 0125 | win32u | Stopgap: a window that has just appeared is repainted once, so After Effects' dialogs no longer come up as black boxes. `WINE_SHOW_REDRAW=0` turns it off |
-| 0129 | comctl32 | Hide tracking tooltips when Photoshop or Illustrator deletes the tracked tool before deactivating tracking |
+| 0133 | comctl32 | Hide tracking tooltips when Photoshop or Illustrator deletes the tracked tool before deactivating tracking |
