@@ -13,11 +13,7 @@ fi
 mkdir -p "$APPS" "$ICONS"
 # What the menu entries run: this checkout's launcher, or the Flatpak's ("flatpak run --command=adobewine <id>").
 EXEC="${ADOBEWINE_EXEC:-$ADOBEWINE_SRC/bin/adobewine}"
-PF="$WINEPREFIX/drive_c/Program Files/Adobe"
-latest() {  # newest installed release folder of an app, e.g. "Adobe Photoshop 2025"
-  local d; d="$(ls -d "$PF/$1 20"[0-9][0-9] 2>/dev/null | sort -V | tail -1)"
-  basename "${d:-$1 2026}"
-}
+source "$ADOBEWINE_SRC/bin/app-catalog.sh"
 icon() {  # icon <name> <exe>: default icon group, retaining color depth and alpha
   python3 "$ADOBEWINE_SRC/scripts/extract-app-icon.py" "$2" "$ICONS/adobewine-$1.png" || true
 }
@@ -38,19 +34,10 @@ StartupWMClass=$5
 EOF
   echo "added $2"
 }
-entry photoshop "Adobe Photoshop" "Graphics;2DGraphics;RasterGraphics;" "image/vnd.adobe.photoshop;image/png;image/jpeg;image/tiff;" photoshop.exe "$PF/$(latest "Adobe Photoshop")/Photoshop.exe"
-entry illustrator "Adobe Illustrator" "Graphics;2DGraphics;VectorGraphics;" "application/illustrator;application/postscript;image/svg+xml;application/pdf;" illustrator.exe "$PF/$(latest "Adobe Illustrator")/Support Files/Contents/Windows/Illustrator.exe"
-entry premiere "Adobe Premiere Pro" "AudioVideo;Video;AudioVideoEditing;" "" "adobe premiere pro.exe" "$PF/$(latest "Adobe Premiere Pro")/Adobe Premiere Pro.exe"
-entry audition "Adobe Audition" "AudioVideo;Audio;AudioVideoEditing;" "audio/x-wav;audio/wav;audio/mpeg;audio/flac;" "adobe audition.exe" "$PF/$(latest "Adobe Audition")/Adobe Audition.exe"
-entry encoder "Adobe Media Encoder" "AudioVideo;Video;" "" "adobe media encoder.exe" "$PF/$(latest "Adobe Media Encoder")/Adobe Media Encoder.exe"
-entry aftereffects "Adobe After Effects" "AudioVideo;Video;AudioVideoEditing;" "" "afterfx.exe" "$PF/$(latest "Adobe After Effects")/Support Files/AfterFX.exe"
-entry indesign "Adobe InDesign" "Graphics;Publishing;" "application/x-indesign;" "indesign.exe" "$PF/$(latest "Adobe InDesign")/InDesign.exe"
-entry animate "Adobe Animate" "Graphics;2DGraphics;VectorGraphics;" "" "animate.exe" "$PF/$(latest "Adobe Animate")/Animate.exe"
-entry bridge "Adobe Bridge" "Graphics;Viewer;" "" "adobe bridge.exe" "$PF/$(latest "Adobe Bridge")/Adobe Bridge.exe"
-entry lightroomclassic "Adobe Lightroom Classic" "Graphics;Photography;" "" "lightroom.exe" "$PF/Adobe Lightroom Classic/Lightroom.exe"
-entry lightroom "Adobe Lightroom" "Graphics;Photography;" "" "lightroom.exe" "$PF/Adobe Lightroom CC/lightroom.exe"
-entry acrobat "Adobe Acrobat" "Office;Viewer;" "application/pdf;" "acrobat.exe" "$PF/Acrobat DC/Acrobat/Acrobat.exe"
-entry cc "Adobe Creative Cloud" "Graphics;" "" "creative cloud.exe" "$PF/Adobe Creative Cloud/ACC/Creative Cloud.exe"
+while IFS='|' read -r command title folder exe categories mime; do
+  wmclass="${exe##*/}"
+  entry "$command" "$title" "$categories" "$mime" "${wmclass,,}" "$ADOBE_PROGRAM_FILES/$(app_folder "$folder")/$exe"
+done < "$ADOBE_APP_CATALOG"
 cat > "$APPS/adobewine-off.desktop" <<EOF
 [Desktop Entry]
 Type=Application

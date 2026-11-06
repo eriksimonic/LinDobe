@@ -23,28 +23,23 @@ REPO = os.environ.get('ADOBEWINE_REPO', 'le-birnes/LinDobe')
 CC_URL = ('https://prod-rel-ffc-ccm.oobesaas.adobe.com/adobe-ffc-external/core/v1/wam/download'
           '?sapCode=KCCC&productName=Creative%20Cloud&os=win')
 NEED_GB = 25
-# command, name, folder (newest year wins, as in bin/adobewine), exe inside it
-APPS = [('photoshop', 'Photoshop', 'Adobe Photoshop', 'Photoshop.exe'),
-        ('illustrator', 'Illustrator', 'Adobe Illustrator', 'Support Files/Contents/Windows/Illustrator.exe'),
-        ('premiere', 'Premiere Pro', 'Adobe Premiere Pro', 'Adobe Premiere Pro.exe'),
-        ('aftereffects', 'After Effects', 'Adobe After Effects', 'Support Files/AfterFX.exe'),
-        ('audition', 'Audition', 'Adobe Audition', 'Adobe Audition.exe'),
-        ('encoder', 'Media Encoder', 'Adobe Media Encoder', 'Adobe Media Encoder.exe'),
-        ('indesign', 'InDesign', 'Adobe InDesign', 'InDesign.exe'),
-        ('bridge', 'Bridge', 'Adobe Bridge', 'Adobe Bridge.exe'),
-        ('lightroomclassic', 'Lightroom Classic', 'Adobe Lightroom Classic', 'Lightroom.exe'),
-        ('lightroom', 'Lightroom', 'Adobe Lightroom CC', 'lightroom.exe'),
-        ('acrobat', 'Acrobat', 'Acrobat DC', 'Acrobat/Acrobat.exe')]
-CC_EXE = os.path.join(PF, 'Adobe Creative Cloud', 'ACC', 'Creative Cloud.exe')
+with open(os.path.join(SRC, 'config', 'apps.txt'), encoding='utf-8') as catalog:
+    APPS = {cmd: (name.removeprefix('Adobe '), folder, exe)
+            for cmd, name, folder, exe, _, _ in (line.rstrip('\n').split('|') for line in catalog)}
+CC_EXE = os.path.join(PF, *APPS['cc'][1:])
 
 
 def installed_apps():
     out = []
-    for cmd, name, folder, exe in APPS:
-        dirs = sorted(glob.glob(os.path.join(PF, folder + ' 20[0-9][0-9]')))
-        if dirs and os.path.isfile(os.path.join(dirs[-1], exe)):
-            out.append((cmd, f'{name} {dirs[-1][-4:]}'))
-        elif os.path.isfile(os.path.join(PF, folder, exe)):             # these folders carry no year
+    for cmd, (name, folder, exe) in APPS.items():
+        if cmd == 'cc':
+            continue
+        if folder.endswith('{year}'):
+            pattern = glob.escape(os.path.join(PF, folder.removesuffix('{year}'))) + '20[0-9][0-9]'
+            dirs = sorted(path for path in glob.glob(pattern) if os.path.isdir(path))
+            if dirs and os.path.isfile(os.path.join(dirs[-1], exe)):
+                out.append((cmd, f'{name} {dirs[-1][-4:]}'))
+        elif os.path.isfile(os.path.join(PF, folder, exe)):
             out.append((cmd, name))
     return out
 
@@ -299,7 +294,7 @@ class Hub(Adw.ApplicationWindow):
     # ---- actions -------------------------------------------------------------------------------------------------
     def launch(self, cmd):
         subprocess.Popen([AW, cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        self.toast(f'Opening {dict((c, n) for c, n, _, _ in APPS).get(cmd, "Creative Cloud")}…')
+        self.toast(f'Opening {APPS[cmd][0]}…')
 
     def menu(self):
         self.run([AW, 'launchers'], lambda s: None,

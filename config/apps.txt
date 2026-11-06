@@ -1,0 +1,14 @@
+photoshop|Adobe Photoshop|Adobe Photoshop {year}|Photoshop.exe|Graphics;2DGraphics;RasterGraphics;|image/vnd.adobe.photoshop;image/png;image/jpeg;image/tiff;
+illustrator|Adobe Illustrator|Adobe Illustrator {year}|Support Files/Contents/Windows/Illustrator.exe|Graphics;2DGraphics;VectorGraphics;|application/illustrator;application/postscript;image/svg+xml;application/pdf;
+premiere|Adobe Premiere Pro|Adobe Premiere Pro {year}|Adobe Premiere Pro.exe|AudioVideo;Video;AudioVideoEditing;|
+audition|Adobe Audition|Adobe Audition {year}|Adobe Audition.exe|AudioVideo;Audio;AudioVideoEditing;|audio/x-wav;audio/wav;audio/mpeg;audio/flac;
+encoder|Adobe Media Encoder|Adobe Media Encoder {year}|Adobe Media Encoder.exe|AudioVideo;Video;|
+aftereffects|Adobe After Effects|Adobe After Effects {year}|Support Files/AfterFX.exe|AudioVideo;Video;AudioVideoEditing;|
+indesign|Adobe InDesign|Adobe InDesign {year}|InDesign.exe|Graphics;Publishing;|application/x-indesign;
+incopy|Adobe InCopy|Adobe InCopy {year}|InCopy.exe|Graphics;Publishing;|
+animate|Adobe Animate|Adobe Animate {year}|Animate.exe|Graphics;2DGraphics;VectorGraphics;|
+bridge|Adobe Bridge|Adobe Bridge {year}|Adobe Bridge.exe|Graphics;Viewer;|
+lightroomclassic|Adobe Lightroom Classic|Adobe Lightroom Classic|Lightroom.exe|Graphics;Photography;|
+lightroom|Adobe Lightroom|Adobe Lightroom CC|lightroom.exe|Graphics;Photography;|
+acrobat|Adobe Acrobat|Acrobat DC|Acrobat/Acrobat.exe|Office;Viewer;|application/pdf;
+cc|Adobe Creative Cloud|Adobe Creative Cloud|ACC/Creative Cloud.exe|Graphics;|
