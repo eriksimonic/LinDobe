@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Edit in Adobe Audition works from Premiere.** Edit > Edit in Adobe Audition > Clip extracts the audio, opens it in Audition, and after you change and save it there, Premiere's clip plays the new version. Tested with real clicks, 3 of 3. Like on Windows, Premiere lets go of its media files when you switch to another app, so Audition can save over them.
+
 - **Premiere's time rulers show every marker and time number again.** With GPU-accelerated UI, the Timeline, Source and Program monitor rulers only showed the rightmost marker and time number, and the ticks disappeared when Time Ruler Numbers was on (#28). Premiere draws each ruler item separately onto one image, and Wine started each drawing from a blank image, erasing the ones before. Patch 0130 keeps what is already there.
 
 - **Premiere's Save project dialog no longer has lines through it.** Wine drew a full-height line at the right edge of each round button (Save, Don't Save, Cancel). The buttons' outlines have a side line a few millionths of a unit long that runs backwards, and Wine turned that into a long spike. Patch 0129 skips lines that short.
