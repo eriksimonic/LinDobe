@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Lightroom Classic's Edit in Photoshop works, and its dialog shows its choices.** Photo > Edit In > Edit in Adobe Photoshop (Ctrl+E) opens the photo in Photoshop, and after you save there Lightroom adds the edited copy and shows the change. The "Edit Photo with Adobe Photoshop" dialog used to show only grey descriptions, with no buttons to pick "Edit a Copy with Lightroom Adjustments", "Edit a Copy" or "Edit Original". Lightroom hands back a drawing surface that belongs to the buttons while they are still drawing, and Wine let go of it where Windows keeps it. Patch 0131. Tested with real clicks, 3 of 3.
+
 - **Photoshop and Illustrator files placed in InDesign round-trip with Edit Original.** Select the placed image, choose Edit > Edit Original, change it in Photoshop or Illustrator and save, and InDesign updates the link and shows the change when you switch back. Tested with real clicks, 3 of 3 each.
 
 - **Edit in Adobe Audition works from Premiere.** Edit > Edit in Adobe Audition > Clip extracts the audio, opens it in Audition, and after you change and save it there, Premiere's clip plays the new version. Tested with real clicks, 3 of 3. Like on Windows, Premiere lets go of its media files when you switch to another app, so Audition can save over them.

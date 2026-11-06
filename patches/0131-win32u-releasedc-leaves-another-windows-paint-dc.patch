@@ -1,0 +1,59 @@
+win32u: ReleaseDC leaves a BeginPaint DC alone when the window does not match.
+
+Lightroom Classic subclasses group boxes, and their WM_ERASEBKGND handler calls ReleaseDC(groupbox, hdc) on the DC it
+is given. A themed radio button inside the group box passes its own BeginPaint DC there through
+DrawThemeParentBackground; Wine released that cache DC, the radio's drawing after it went nowhere, and the radio
+buttons of "Edit Photo with Adobe Photoshop" (Photo > Edit In, Ctrl+E) never showed, leaving only their grey
+descriptions. On Windows they draw. A DC handed out by BeginPaint is now kept until EndPaint when ReleaseDC names
+another window. That holds whether Windows checks the window or keeps paint DCs for EndPaint; Lightroom makes about
+six such calls per dialog, while its thousands of other mismatched ReleaseDC calls (GetDC DCs) behave as before.
+Repro: wine/tests/paint/relpaintdc.c.
+
+--- a/dlls/win32u/dce.c
++++ b/dlls/win32u/dce.c
+@@ -43,6 +43,7 @@
+     UINT        flags;
+     LONG        count;         /* usage count; 0 or 1 for cache DCEs, always 1 for window DCEs,
+                                   always >= 1 for class DCEs */
++    BOOL        paint;         /* handed out by BeginPaint, until EndPaint */
+ };
+ 
+ static struct list dce_list = LIST_INIT(dce_list);
+@@ -984,6 +985,7 @@
+     dce->clip_rgn  = 0;
+     dce->flags     = 0;
+     dce->count     = 1;
++    dce->paint     = FALSE;
+ 
+     set_dc_dce( dce->hdc, dce );
+     return dce;
+@@ -1244,6 +1246,15 @@
+ 
+     user_lock();
+     dce = get_dc_dce( hdc );
++    if (dce && dce->paint && !end_paint && hwnd != dce->hwnd)
++    {
++        /* Lightroom Classic's group boxes call ReleaseDC(groupbox, hdc) on the BeginPaint DC their child radio
++         * buttons pass in WM_ERASEBKGND; the DC must stay usable for the child until its EndPaint. */
++        WARN( "not releasing %p, the paint DC of %p, for %p\n", hdc, dce->hwnd, hwnd );
++        user_unlock();
++        return FALSE;
++    }
++    if (dce && end_paint) dce->paint = FALSE;
+     if (dce && dce->count && dce->hwnd)
+     {
+         if (!(dce->flags & DCX_NORESETATTRS)) set_dce_flags( dce->hdc, DCHF_RESETDC );
+@@ -1642,6 +1653,13 @@
+                     need_erase = !send_message( hwnd, WM_ERASEBKGND, (WPARAM)hdc, 0 );
+             }
+             if (!hdc_ret) release_dc( hwnd, hdc, TRUE );
++            else
++            {
++                struct dce *dce;
++                user_lock();
++                if ((dce = get_dc_dce( hdc ))) dce->paint = TRUE;
++                user_unlock();
++            }
+         }
+ 
+         if (hdc_ret) *hdc_ret = hdc;
