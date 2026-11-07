@@ -31,7 +31,8 @@ x86_64-w64-mingw32-strip "$OUT/d3d12core.dll"
 
 # DXVK 3.1.1 d3d11.dll: Intel's "Intel Device Information" counter (Premiere reads the GPU generation from it and
 # otherwise rejects Intel GPUs as "Hardware out of date"); idle presenters give up their Vulkan swapchain past 192 live
-# ones, as the NVIDIA driver refuses the 253rd (Audition's long-session hang; tests/misc/swapchurn.c, vkswapcap.c)
+# ones, as the NVIDIA driver refuses the 253rd, and at once when their window was destroyed, as such a swapchain can
+# make the NVIDIA driver lose the device (Audition's long-session hang; tests/misc/swapchurn.c, vkswapcap.c)
 D=$SRC/dxvk-adobewine
 if [ ! -d "$D" ]; then
   git clone -q --branch v3.1.1 --depth 1 https://github.com/doitsujin/dxvk.git "$D"

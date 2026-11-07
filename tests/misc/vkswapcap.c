@@ -65,6 +65,7 @@ int main(int argc, char **argv)
                 r = vkQueuePresentKHR(q, &pi);
                 if (r < 0) { printf("present %d: %d\n", i, r); return 3; }
             }
+            if (getenv("IDLE")) vkQueueWaitIdle(q);   /* IDLE=1: no present in flight when the window goes */
             if (atoi(getenv("ORPHAN")) == 2)   /* what Wine does: reparent to an unmapped dummy window */
             {
                 static xcb_window_t dummy;
@@ -82,7 +83,6 @@ int main(int argc, char **argv)
                     }
                     if (getenv("MAPPED")) xcb_map_window(c, dummy);
                 }
-                if (getenv("IDLE")) vkQueueWaitIdle(q);   /* IDLE=1: no present in flight at the reparent */
                 xcb_reparent_window(c, w, dummy, 0, 0);
             }
             else if (atoi(getenv("ORPHAN")) == 1) xcb_destroy_window(c, w);   /* ORPHAN=3: control, the window stays */

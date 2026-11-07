@@ -1,13 +1,13 @@
 diff --git a/src/dxvk/dxvk_presenter.cpp b/src/dxvk/dxvk_presenter.cpp
-index f93ae8d..755073c 100644
+index f93ae8d..d6a130e 100644
 --- a/src/dxvk/dxvk_presenter.cpp
 +++ b/src/dxvk/dxvk_presenter.cpp
-@@ -7,6 +7,74 @@
+@@ -7,6 +7,111 @@
  
  namespace dxvk {
  
 +  // AdobeWine: the NVIDIA Linux driver refuses a process's 253rd live VkSwapchainKHR with
-+  // VK_ERROR_INITIALIZATION_FAILED (tests/misc/vkswapcap.c, no Wine involved; surfaces alone are not
++  // VK_ERROR_INITIALIZATION_FAILED (wine/tests/misc/vkswapcap.c, no Wine involved; surfaces alone are not
 +  // limited, Intel takes 300+). Windows has no such limit, and Adobe Audition keeps ~250 DXGI swapchains alive in a
 +  // long session (one per dvaui panel it ever showed); the failed creation then ended in a device loss and a hang.
 +  // So all presenters are listed, live swapchains are counted, and above the limit (DXVK_SWAPCHAIN_LIMIT, default
@@ -74,10 +74,47 @@ index f93ae8d..755073c 100644
 +    return evicted;
 +  }
 +
++  // AdobeWine: a live VkSwapchainKHR whose window was destroyed (the app keeps the DXGI swapchain, as Audition
++  // does) can make the NVIDIA driver lose the device on a later submit, idle or not (wine/tests/misc/swapchurn.c
++  // KEEP=1). Wine reports such a surface as lost, so before each new swapchain the idle presenters whose window is
++  // gone give theirs up; a later acquire recreates it if the window comes back.
++  uint32_t Presenter::releaseOrphanedSwapchains(Presenter* self) {
++    std::lock_guard lock(s_presenterMutex);
++
++    auto now = high_resolution_clock::now();
++    uint32_t released = 0u;
++
++    for (auto p : s_presenters) {
++      if (p == self || p->m_device != self->m_device)
++        continue;
++
++      // Only presenters idle for a while: the query must not overlap their own presents
++      std::unique_lock other(p->m_surfaceMutex, std::try_to_lock);
++
++      if (!other.owns_lock() || !p->m_swapchain || !p->m_surface || p->m_presentPending
++       || now - p->m_lastUsed < std::chrono::milliseconds(500))
++        continue;
++
++      VkSurfaceCapabilitiesKHR caps = { };
++
++      if (p->m_vki->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(p->m_device->adapter()->handle(),
++          p->m_surface, &caps) != VK_ERROR_SURFACE_LOST_KHR)
++        continue;
++
++      p->destroySwapchain();
++      released += 1u;
++    }
++
++    if (released)
++      Logger::info(str::format("Presenter: released ", released, " swapchains of destroyed windows, ", s_liveSwapchains.load(), " live"));
++
++    return released;
++  }
++
    const std::array<std::pair<VkColorSpaceKHR, VkColorSpaceKHR>, 2> Presenter::s_colorSpaceFallbacks = {{
      { VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT, VK_COLOR_SPACE_HDR10_ST2084_EXT },
  
-@@ -48,10 +116,14 @@ namespace dxvk {
+@@ -48,10 +153,14 @@ namespace dxvk {
      // the present fence if presentation is queued but fails.
      // TODO Remove this hack when this gets fixed in stable SteamOS.
      m_hasGamescopeFenceSignalBug = env::getEnvVar("ENABLE_GAMESCOPE_WSI") == "1";
@@ -92,7 +129,7 @@ index f93ae8d..755073c 100644
      destroySwapchain();
      destroySurface();
      destroyLatencySemaphore();
-@@ -92,6 +164,8 @@ namespace dxvk {
+@@ -92,6 +201,8 @@ namespace dxvk {
      if (status < 0)
        return status;
  
@@ -101,11 +138,13 @@ index f93ae8d..755073c 100644
      // Ensure that the swap chain gets recreated if it is dirty
      bool hasSwapchain = m_swapchain != VK_NULL_HANDLE;
  
-@@ -783,10 +857,23 @@ namespace dxvk {
+@@ -783,10 +894,25 @@ namespace dxvk {
        "\n  Buffer size:  ", swapInfo.imageExtent.width, "x", swapInfo.imageExtent.height,
        "\n  Image count:  ", swapInfo.minImageCount));
      
 -    if ((status = m_vkd->vkCreateSwapchainKHR(m_vkd->device(), &swapInfo, nullptr, &m_swapchain))) {
++    releaseOrphanedSwapchains(this);
++
 +    if (s_liveSwapchains.load() >= swapchainLimit())
 +      evictIdleSwapchains(this, 16u);
 +
@@ -126,7 +165,7 @@ index f93ae8d..755073c 100644
      
      // Import actual swap chain images
      std::vector<VkImage> images;
-@@ -1244,8 +1331,10 @@ namespace dxvk {
+@@ -1244,8 +1370,10 @@ namespace dxvk {
      }
  
      // The conditional is here because some third party layers don't properly handle null swapchains
@@ -139,7 +178,7 @@ index f93ae8d..755073c 100644
      m_images.clear();
      m_semaphores.clear();
 diff --git a/src/dxvk/dxvk_presenter.h b/src/dxvk/dxvk_presenter.h
-index f4b8a0c..940f2c4 100644
+index f4b8a0c..89f7e79 100644
 --- a/src/dxvk/dxvk_presenter.h
 +++ b/src/dxvk/dxvk_presenter.h
 @@ -11,6 +11,7 @@
@@ -161,11 +200,13 @@ index f4b8a0c..940f2c4 100644
      bool                        m_presentRepaint = false;
  
      std::optional<VkHdrMetadataEXT> m_hdrMetadata;
-@@ -340,6 +345,10 @@ namespace dxvk {
+@@ -340,6 +345,12 @@ namespace dxvk {
  
      VkResult createSwapChain();
  
 +    static uint32_t evictIdleSwapchains(Presenter* self, uint32_t count);
++
++    static uint32_t releaseOrphanedSwapchains(Presenter* self);
 +
 +    static void registerPresenter(Presenter* presenter, bool add);
 +

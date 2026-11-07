@@ -2,7 +2,7 @@
  * dialog part), DXVK kept up to 82 presenter threads alive, and Vulkan then refused a swapchain (DEVICE_LOST /
  * INITIALIZATION_FAILED; the UI thread then waited forever in Map). This repeats: create a 451x410 window, a flip-model
  * swapchain for it on one shared D3D11 device, present a few frames, release the swapchain (optionally keep it:
- * KEEP=1; KEEP=2 also keeps the window; LATE=1 destroys the window before the release), destroy the window. Prints failures and the process's live thread count every 25 rounds.
+ * KEEP=1; KEEP=2 also keeps the window; LATE=1 destroys the window before the release; DELAY=ms waits before the destroy), destroy the window. Prints failures and the process's live thread count every 25 rounds.
  * Build: x86_64-w64-mingw32-gcc -O2 -o swapchurn.exe swapchurn.c -ld3d11 -ldxgi -luser32 -lgdi32 -ldxguid
  * Usage: swapchurn.exe [rounds, default 300] */
 #define COBJMACROS
@@ -57,6 +57,7 @@ int main(int argc, char **argv)
         MSG m; while (PeekMessageA(&m, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&m);
         /* KEEP=1 keeps the swapchain, KEEP=2 keeps the swapchain and its window, LATE=1 destroys the window first and
          * then releases the swapchain */
+        if (getenv("DELAY")) { ID3D11DeviceContext_Flush(ctx); Sleep(atoi(getenv("DELAY"))); }   /* DELAY=ms: nothing in flight at the destroy */
         if (late) { DestroyWindow(w); IDXGISwapChain1_Release(sc); }
         else if (keep) { kept[i] = sc; if (keep < 2) DestroyWindow(w); }
         else { IDXGISwapChain1_Release(sc); DestroyWindow(w); }
