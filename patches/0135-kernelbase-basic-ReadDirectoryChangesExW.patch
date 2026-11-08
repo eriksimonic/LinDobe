@@ -1,0 +1,86 @@
+kernelbase: Add ReadDirectoryChangesExW with basic notifications and explicit extended-format failure.
+
+Animation Composer 4.2.6 tries extended notifications, then uses
+ReadDirectoryChangesW when that request fails. The missing entry currently
+raises EXCEPTION_WINE_STUB during After Effects startup instead of allowing
+the fallback. Implement the basic information class using the existing API;
+report ERROR_INVALID_FUNCTION for unsupported extended notifications, as for
+an unsupported filesystem. Do not return basic records as extended records.
+
+--- a/dlls/kernel32/kernel32.spec
++++ b/dlls/kernel32/kernel32.spec
+@@ -1236,6 +1236,7 @@
+ @ stdcall -import ReadConsoleOutputCharacterW(long ptr long long ptr)
+ @ stdcall -import ReadConsoleOutputW(long ptr long long ptr)
+ @ stdcall -import ReadConsoleW(long ptr long ptr ptr)
++@ stdcall -import ReadDirectoryChangesExW(long ptr long long long ptr ptr ptr long)
+ @ stdcall -import ReadDirectoryChangesW(long ptr long long long ptr ptr ptr)
+ @ stdcall -import ReadFile(long ptr long ptr ptr)
+ @ stdcall -import ReadFileEx(long ptr long ptr ptr)
+--- a/dlls/kernelbase/kernelbase.spec
++++ b/dlls/kernelbase/kernelbase.spec
+@@ -1291,6 +1291,7 @@
+ @ stdcall ReadConsoleOutputCharacterW(long ptr long long ptr)
+ @ stdcall ReadConsoleOutputW(long ptr long long ptr)
+ @ stdcall ReadConsoleW(long ptr long ptr ptr)
++@ stdcall ReadDirectoryChangesExW(long ptr long long long ptr ptr ptr long)
+ @ stdcall ReadDirectoryChangesW(long ptr long long long ptr ptr ptr)
+ @ stdcall ReadFile(long ptr long ptr ptr)
+ @ stdcall ReadFileEx(long ptr long ptr ptr)
+--- a/dlls/kernelbase/file.c
++++ b/dlls/kernelbase/file.c
+@@ -3619,6 +3619,30 @@
+ 
+ 
+ /***********************************************************************
++ *      ReadDirectoryChangesExW   (kernelbase.@)
++ */
++BOOL WINAPI DECLSPEC_HOTPATCH ReadDirectoryChangesExW( HANDLE handle, LPVOID buffer, DWORD len,
++        BOOL subtree, DWORD filter, LPDWORD returned, LPOVERLAPPED overlapped,
++        LPOVERLAPPED_COMPLETION_ROUTINE completion, READ_DIRECTORY_NOTIFY_INFORMATION_CLASS info_class )
++{
++    TRACE( "%p %p %08lx %d %08lx %p %p %p %u\n",
++            handle, buffer, len, subtree, filter, returned, overlapped, completion, info_class );
++
++    if (info_class == ReadDirectoryNotifyExtendedInformation)
++    {
++        SetLastError( ERROR_INVALID_FUNCTION );
++        return FALSE;
++    }
++    if (info_class != ReadDirectoryNotifyInformation)
++    {
++        SetLastError( ERROR_INVALID_PARAMETER );
++        return FALSE;
++    }
++    return ReadDirectoryChangesW( handle, buffer, len, subtree, filter, returned, overlapped, completion );
++}
++
++
++/***********************************************************************
+  *	ReadFile   (kernelbase.@)
+  */
+ BOOL WINAPI DECLSPEC_HOTPATCH ReadFile( HANDLE file, LPVOID buffer, DWORD count,
+--- a/include/winbase.h
++++ b/include/winbase.h
+@@ -1364,6 +1364,13 @@
+ 
+ typedef enum _RTL_UMS_SCHEDULER_REASON UMS_SCHEDULER_REASON;
+ typedef enum _RTL_UMS_THREAD_INFO_CLASS UMS_THREAD_INFO_CLASS, *PUMS_THREAD_INFO_CLASS;
++
++typedef enum _READ_DIRECTORY_NOTIFY_INFORMATION_CLASS
++{
++    ReadDirectoryNotifyInformation = 1,
++    ReadDirectoryNotifyExtendedInformation,
++    ReadDirectoryNotifyMaximumInformation
++} READ_DIRECTORY_NOTIFY_INFORMATION_CLASS, *PREAD_DIRECTORY_NOTIFY_INFORMATION_CLASS;
+ 
+ typedef enum _STREAM_INFO_LEVELS
+ {
+@@ -2191,6 +2198,7 @@
+ WINADVAPI  BOOL        WINAPI ReadEventLogA(HANDLE,DWORD,DWORD,LPVOID,DWORD,DWORD *,DWORD *);
+ WINADVAPI  BOOL        WINAPI ReadEventLogW(HANDLE,DWORD,DWORD,LPVOID,DWORD,DWORD *,DWORD *);
+ #define                       ReadEventLog WINELIB_NAME_AW(ReadEventLog)
++WINBASEAPI BOOL        WINAPI ReadDirectoryChangesExW(HANDLE,LPVOID,DWORD,BOOL,DWORD,LPDWORD,LPOVERLAPPED,LPOVERLAPPED_COMPLETION_ROUTINE,READ_DIRECTORY_NOTIFY_INFORMATION_CLASS);
+ WINBASEAPI BOOL        WINAPI ReadDirectoryChangesW(HANDLE,LPVOID,DWORD,BOOL,DWORD,LPDWORD,LPOVERLAPPED,LPOVERLAPPED_COMPLETION_ROUTINE);
+ WINADVAPI  DWORD       WINAPI ReadEncryptedFileRaw(PFE_EXPORT_FUNC,PVOID,PVOID);
+ WINBASEAPI BOOL        WINAPI ReadFile(HANDLE,LPVOID,DWORD,LPDWORD,LPOVERLAPPED);
