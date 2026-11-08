@@ -120,3 +120,6 @@ to WineHQ; help with that is very welcome.
 | 0120 | comdlg32 | Extra buttons in file dialogs are as wide as their label ("Open from Adobe cloud storage"). By nvb-uy |
 | 0125 | win32u | Stopgap: a window that has just appeared is repainted once, so After Effects' dialogs no longer come up as black boxes. `WINE_SHOW_REDRAW=0` turns it off |
 | 0133 | comctl32 | Hide tracking tooltips when Photoshop or Illustrator deletes the tracked tool before deactivating tracking |
+| 0134 | dxgi | Route `WaitForVBlank` through the existing D3DKMT wait (0047), allowing JUCE's VBlankThread to deliver frame notifications and finish shutdown. Mister Horse investigation: [MISTER-HORSE.md](MISTER-HORSE.md) |
+| 0135 | kernelbase, kernel32 | Add `ReadDirectoryChangesExW`: basic notifications work, extended notifications return an explicit unsupported error instead of aborting. Lets Animation Composer try its existing legacy notification fallback |
+| 0136 | win32u | Keep vkd3d's presentation visible when another client surface targets the same HWND; release ownership with the swapchain. Mixed probe and After Effects/Animation Composer playback, save/reopen and render pass; broader Adobe regression testing pending |
