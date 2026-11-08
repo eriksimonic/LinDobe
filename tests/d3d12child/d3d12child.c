@@ -3,11 +3,12 @@
  * (offscreen client surfaces) reach the screen. With "-wait" the swapchain has a frame latency waitable
  * object that is waited on (1 s timeout) before each frame, as AE does; timeouts are counted. With "-once"
  * it presents a single red frame and then only pumps messages (AE presents a static composition once).
- * Build: x86_64-w64-mingw32-gcc -O2 -o d3d12child.exe d3d12child.c -ld3d12 -ldxgi -luuid -mwindows */
+ * Build: x86_64-w64-mingw32-gcc -O2 -o d3d12child.exe d3d12child.c -ld3d12 -ld2d1 -ldxgi -luuid -mwindows */
 #define COBJMACROS
 #include <windows.h>
 #include <initguid.h>
 #include <d3d12.h>
+#include <d2d1.h>
 #include <dxgi1_4.h>
 #include <stdio.h>
 
@@ -15,6 +16,32 @@ static LRESULT CALLBACK proc( HWND h, UINT m, WPARAM w, LPARAM l )
 {
     if (m == WM_DESTROY) PostQuitMessage( 0 );
     return DefWindowProcW( h, m, w, l );
+}
+
+static HRESULT create_underlay( HWND hwnd, ID2D1Factory **factory, ID2D1HwndRenderTarget **target )
+{
+    D2D1_RENDER_TARGET_PROPERTIES props = {0};
+    D2D1_HWND_RENDER_TARGET_PROPERTIES hwnd_props = {0};
+    HRESULT hr;
+
+    props.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    props.pixelFormat.alphaMode = D2D1_ALPHA_MODE_IGNORE;
+    hwnd_props.hwnd = hwnd;
+    hwnd_props.pixelSize.width = 500;
+    hwnd_props.pixelSize.height = 350;
+    hwnd_props.presentOptions = D2D1_PRESENT_OPTIONS_IMMEDIATELY;
+    hr = D2D1CreateFactory( D2D1_FACTORY_TYPE_SINGLE_THREADED, &IID_ID2D1Factory, NULL, (void **)factory );
+    if (FAILED(hr)) return hr;
+    return ID2D1Factory_CreateHwndRenderTarget( *factory, &props, &hwnd_props, target );
+}
+
+static HRESULT draw_underlay( ID2D1HwndRenderTarget *target, BOOL released )
+{
+    D2D1_COLOR_F color = {0, released ? 1.0f : 0.0f, 0, 1};
+
+    ID2D1HwndRenderTarget_BeginDraw( target );
+    ID2D1HwndRenderTarget_Clear( target, &color );
+    return ID2D1HwndRenderTarget_EndDraw( target, NULL, NULL );
 }
 
 int WINAPI WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
@@ -28,8 +55,14 @@ int WINAPI WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
     DXGI_SWAP_CHAIN_DESC1 sd = {0}; D3D12_CPU_DESCRIPTOR_HANDLE rtv; UINT rtv_size, i, frame = 0;
     UINT64 fv = 0; HANDLE ev = CreateEventW( NULL, FALSE, FALSE, NULL ); DWORD start = GetTickCount(); MSG msg;
     BOOL once = cmd && strstr( cmd, "-once" ) != NULL;
+    BOOL underlay = cmd && strstr( cmd, "-underlay" ) != NULL, released = FALSE;
+    ID2D1Factory *d2d_factory = NULL;
+    ID2D1HwndRenderTarget *d2d_target = NULL;
     BOOL use_wait = cmd && strstr( cmd, "-wait" ) != NULL; HANDLE latency = NULL; UINT timeouts = 0;
     FILE *log = fopen( "C:\\users\\Public\\d3d12child.log", "w" );
+
+    if (!log) return 1;
+    once = once || underlay;
 
     wc.lpfnWndProc = proc; wc.hInstance = inst; wc.lpszClassName = L"d3d12child";
     wc.hbrBackground = (HBRUSH)GetStockObject( GRAY_BRUSH ); wc.hCursor = LoadCursorW( NULL, (LPCWSTR)IDC_ARROW );
@@ -65,17 +98,45 @@ int WINAPI WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
     for (;;)
     {
         D3D12_RESOURCE_BARRIER b = {0}; float red[4] = {1, 0, 0, 1}, green[4] = {0, 1, 0, 1};
-        UINT idx = IDXGISwapChain3_GetCurrentBackBufferIndex( sc );
+        UINT idx;
         while (PeekMessageW( &msg, 0, 0, 0, PM_REMOVE )) { if (msg.message == WM_QUIT) return 0; DispatchMessageW( &msg ); }
-        if (GetTickCount() - start > 10000) break;
-        if (once && frame) { Sleep( 10 ); continue; }
+        if (GetTickCount() - start > (underlay ? 25000 : 10000)) break;
+        if (once && frame)
+        {
+            if (underlay)
+            {
+                HRESULT hr;
+
+                if (!d2d_target)
+                {
+                    hr = create_underlay( child, &d2d_factory, &d2d_target );
+                    fprintf( log, "D2D underlay creation %#lx; D3D12 red should remain visible until release\n", (unsigned long)hr );
+                    fflush( log );
+                    if (FAILED(hr)) return 1;
+                }
+                if (!released && GetTickCount() - start >= 15000)
+                {
+                    for (i = 0; i < 2; i++) ID3D12Resource_Release( buffers[i] );
+                    IDXGISwapChain3_Release( sc );
+                    IDXGISwapChain1_Release( sc1 );
+                    released = TRUE;
+                    fprintf( log, "D3D12 swapchain released; D2D green should become visible\n" );
+                    fflush( log );
+                }
+                hr = draw_underlay( d2d_target, released );
+                if (FAILED(hr)) { fprintf( log, "D2D EndDraw %#lx\n", (unsigned long)hr ); return 1; }
+            }
+            Sleep( underlay ? 100 : 10 );
+            continue;
+        }
+        idx = IDXGISwapChain3_GetCurrentBackBufferIndex( sc );
         if (latency && WaitForSingleObject( latency, 1000 ) == WAIT_TIMEOUT) timeouts++;
         ID3D12CommandAllocator_Reset( alloc ); ID3D12GraphicsCommandList_Reset( list, alloc, NULL );
         b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION; b.Transition.pResource = buffers[idx];
         b.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT; b.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
         ID3D12GraphicsCommandList_ResourceBarrier( list, 1, &b );
         rtv_heap->lpVtbl->GetCPUDescriptorHandleForHeapStart( rtv_heap, &rtv ); rtv.ptr += idx * rtv_size;
-        ID3D12GraphicsCommandList_ClearRenderTargetView( list, rtv, GetTickCount() - start < 3000 ? red : green, 0, NULL );
+        ID3D12GraphicsCommandList_ClearRenderTargetView( list, rtv, underlay || GetTickCount() - start < 3000 ? red : green, 0, NULL );
         b.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; b.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
         ID3D12GraphicsCommandList_ResourceBarrier( list, 1, &b );
         ID3D12GraphicsCommandList_Close( list );
@@ -84,7 +145,10 @@ int WINAPI WinMain( HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show )
         ID3D12CommandQueue_Signal( queue, fence, ++fv );
         ID3D12Fence_SetEventOnCompletion( fence, fv, ev ); WaitForSingleObject( ev, INFINITE );
         frame++;
+        if (underlay) start = GetTickCount();
     }
+    if (d2d_target) ID2D1HwndRenderTarget_Release( d2d_target );
+    if (d2d_factory) ID2D1Factory_Release( d2d_factory );
     fprintf( log, "frames %u latency timeouts %u\n", frame, timeouts ); fclose( log );
     return 0;
 }

@@ -1,0 +1,121 @@
+win32u: Keep vkd3d presentation ahead of competing surfaces for the same HWND.
+
+After Effects 26.5 presents its composition through vkd3d D3D12, but also
+presents a D3D11/DXVK surface to the same HWND. Copying both client surfaces
+into the toplevel lets the legacy target cover the composition with black
+when the timeline is hovered or the viewer is clicked.
+
+Identify vkd3d through its Vulkan engine name. After a successful present,
+retain that client surface as the window's presentation owner. Other client
+surfaces for that HWND cannot overwrite it until the owning swapchain or
+surface is destroyed. A private window property tracks ownership without
+changing the graphics-driver ABI or adding launcher configuration.
+
+This is a targeted vkd3d compatibility rule, not a general composition model
+for arbitrarily layered graphics APIs. Microsoft discourages combining flip
+presentation and other APIs in one HWND; Windows reference testing and broader
+Adobe regression coverage remain necessary before general deployment.
+
+Reproducer: tests/d3d12child/d3d12child.c -underlay. With the original runtime,
+the user observes black then green. With this patch: retained red then green
+when the D3D12 swapchain is released. Tested on Wine 11.20, X11/Hyprland,
+NVIDIA RTX 3060. See docs/MISTER-HORSE.md for application validation.
+
+--- a/dlls/win32u/window.c
++++ b/dlls/win32u/window.c
+@@ -296,6 +296,10 @@
+ }
+ 
+ static pthread_mutex_t surfaces_lock = PTHREAD_MUTEX_INITIALIZER;
++const WCHAR vkd3d_surface_prop[] =
++    {'_','_','w','i','n','e','_','v','k','d','3','d','_','p','r','e','s','e','n','t','_',
++     's','u','r','f','a','c','e',0};
++
+ static struct list client_surfaces = LIST_INIT( client_surfaces ); /* non-owning used client surfaces */
+ static struct list unused_surfaces = LIST_INIT( unused_surfaces ); /* owning unused client surfaces */
+ 
+@@ -464,7 +468,10 @@
+ 
+     if ((hwnd = surface->hwnd))
+     {
++        struct client_surface *owner = NtUserGetProp( hwnd, vkd3d_surface_prop );
++
+         client_surface_update_locked( surface );
++        if (owner && owner != surface) return;
+         /* A hidden window shows nothing; copying its stale content would paint over a
+          * visible sibling at the same place (Audition stacks its editors that way). */
+         if (surface->offscreen && is_window_visible( hwnd ))
+--- a/dlls/win32u/vulkan.c
++++ b/dlls/win32u/vulkan.c
+@@ -102,6 +102,7 @@
+ {
+     struct vulkan_instance obj;
+     BOOL enable_win32_surface;
++    BOOL is_vkd3d;
+ 
+     struct list utils_messengers;
+     struct list report_callbacks;
+@@ -146,6 +147,7 @@
+     struct client_surface *client;
+     HWND hwnd;
+     struct swapchain *swapchain;  /* most recent swapchain */
++    BOOL is_vkd3d;
+ };
+ 
+ static struct surface *surface_from_handle( VkSurfaceKHR handle )
+@@ -613,6 +615,8 @@
+         return VK_ERROR_OUT_OF_HOST_MEMORY;
+     physical_devices = (struct vulkan_physical_device *)(instance + 1);
+     instance->obj.extensions = client_instance->extensions;
++    instance->is_vkd3d = create_info->pApplicationInfo && create_info->pApplicationInfo->pEngineName
++            && !strcmp( create_info->pApplicationInfo->pEngineName, "vkd3d" );
+     list_init( &instance->utils_messengers );
+     list_init( &instance->report_callbacks );
+ 
+@@ -1584,6 +1588,7 @@
+         free( surface );
+         return res;
+     }
++    surface->is_vkd3d = instance_from_handle( client_instance )->is_vkd3d;
+     set_window_pixel_format( surface->hwnd, -1, TRUE );
+ 
+     vulkan_object_init( &surface->obj.obj, host_surface );
+@@ -1608,6 +1613,8 @@
+     if (allocator) FIXME( "Support for allocation callbacks not implemented yet\n" );
+ 
+     instance->p_vkDestroySurfaceKHR( instance->host.instance, surface->obj.host.surface, NULL /* allocator */ );
++    if (surface->is_vkd3d && NtUserGetProp( surface->hwnd, vkd3d_surface_prop ) == surface->client)
++        NtUserRemoveProp( surface->hwnd, vkd3d_surface_prop );
+     use_window_client_surface( surface->client, FALSE );
+     client_surface_release( surface->client );
+ 
+@@ -2089,6 +2096,9 @@
+     instance->p_remove_object( instance, &swapchain->obj.obj );
+     if (swapchain->surface->swapchain == swapchain)
+     {
++        if (swapchain->surface->is_vkd3d
++                && NtUserGetProp( swapchain->surface->hwnd, vkd3d_surface_prop ) == swapchain->surface->client)
++            NtUserRemoveProp( swapchain->surface->hwnd, vkd3d_surface_prop );
+         swapchain->surface->swapchain = NULL;
+         swapchain->surface->client->buffer_size.cx = swapchain->surface->client->buffer_size.cy = 0;
+     }
+@@ -2224,6 +2234,9 @@
+         struct surface *surface = swapchain->surface;
+         BOOL will_wait = FALSE;
+         RECT client_rect;
++
++        if (surface->is_vkd3d && swapchain_res >= VK_SUCCESS)
++            NtUserSetProp( surface->hwnd, vkd3d_surface_prop, surface->client );
+ 
+         if (surface->client->offscreen && can_wait && res >= VK_SUCCESS)
+             will_wait = (ids && i < ids->swapchainCount && ids->pPresentIds && ids->pPresentIds[i]) ||
+--- a/dlls/win32u/win32u_private.h
++++ b/dlls/win32u/win32u_private.h
+@@ -340,6 +340,7 @@
+ extern BOOL client_surface_set_color_space( struct client_surface *surface, VkColorSpaceKHR color_space );
+ extern BOOL client_surface_get_size( struct client_surface *surface, SIZE *virtual_size, SIZE *monitor_size );
+ extern void present_offscreen_client_surfaces( HWND toplevel );
++extern const WCHAR vkd3d_surface_prop[];
+ extern void use_window_client_surface( struct client_surface *surface, BOOL use );
+ extern struct client_surface *get_unused_client_surface( HWND hwnd, int format, BOOL raw );
+ extern HICON get_window_icon_info( HWND hwnd, UINT type, HICON icon, ICONINFO *ret );
