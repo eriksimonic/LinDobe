@@ -1,0 +1,77 @@
+dxgi: Wait for vertical blank through the existing D3DKMT implementation.
+
+JUCE 8 checks its VBlankThread exit flag only after WaitForVBlank succeeds.
+The E_NOTIMPL stub prevents frame notifications and can hang thread shutdown
+while a window is being constructed. Mister Horse Product Manager 3.7.7 uses
+JUCE 8.0.10 and encounters this when using Wine's DXGI implementation.
+Reuse LinDobe's D3DKMT wait from patch 0047 and release the adapter after each
+wait. This inherits 0047's refresh-based pacing, not hardware vblank timing.
+Reproducer: tests/vblank/dxgi.c.
+
+--- a/dlls/dxgi/output.c
++++ b/dlls/dxgi/output.c
+@@ -17,6 +17,7 @@
+  */
+ 
+ #include "dxgi_private.h"
++#include "ddk/d3dkmthk.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(dxgi);
+ 
+@@ -363,14 +364,38 @@
+ 
+ static HRESULT STDMETHODCALLTYPE dxgi_output_WaitForVBlank(IDXGIOutput6 *iface)
+ {
+-    static BOOL once = FALSE;
+-
+-    if (!once++)
+-        FIXME("iface %p stub!\n", iface);
+-    else
+-        TRACE("iface %p stub!\n", iface);
+-
+-    return E_NOTIMPL;
++    D3DKMT_OPENADAPTERFROMGDIDISPLAYNAME adapter = {{0}};
++    D3DKMT_WAITFORVERTICALBLANKEVENT wait = {0};
++    D3DKMT_CLOSEADAPTER close;
++    DXGI_OUTPUT_DESC desc;
++    NTSTATUS status;
++    HRESULT hr;
++
++    TRACE("iface %p.\n", iface);
++
++    if (FAILED(hr = dxgi_output_GetDesc(iface, &desc)))
++        return hr;
++    if (!desc.AttachedToDesktop)
++        return DXGI_ERROR_NOT_CURRENTLY_AVAILABLE;
++
++    memcpy(adapter.DeviceName, desc.DeviceName, sizeof(adapter.DeviceName));
++    if ((status = D3DKMTOpenAdapterFromGdiDisplayName(&adapter)))
++    {
++        WARN("Failed to open output adapter, status %#lx.\n", status);
++        return DXGI_ERROR_NOT_CURRENTLY_AVAILABLE;
++    }
++
++    wait.hAdapter = adapter.hAdapter;
++    wait.VidPnSourceId = adapter.VidPnSourceId;
++    status = D3DKMTWaitForVerticalBlankEvent(&wait);
++    close.hAdapter = adapter.hAdapter;
++    D3DKMTCloseAdapter(&close);
++    if (status)
++    {
++        WARN("Failed to wait for vertical blank, status %#lx.\n", status);
++        return DXGI_ERROR_NOT_CURRENTLY_AVAILABLE;
++    }
++    return S_OK;
+ }
+ 
+ static HRESULT STDMETHODCALLTYPE dxgi_output_TakeOwnership(IDXGIOutput6 *iface, IUnknown *device, BOOL exclusive)
+--- a/include/ddk/d3dkmthk.h
++++ b/include/ddk/d3dkmthk.h
+@@ -1291,6 +1291,7 @@
+ NTSTATUS WINAPI D3DKMTShareObjects( UINT count, const D3DKMT_HANDLE *handles, OBJECT_ATTRIBUTES *attr, UINT access, HANDLE *handle );
+ NTSTATUS WINAPI D3DKMTSignalSynchronizationObjectFromCpu( const D3DKMT_SIGNALSYNCHRONIZATIONOBJECTFROMCPU *params );
+ NTSTATUS WINAPI D3DKMTWaitForSynchronizationObjectFromCpu( const D3DKMT_WAITFORSYNCHRONIZATIONOBJECTFROMCPU *params );
++NTSTATUS WINAPI D3DKMTWaitForVerticalBlankEvent(const D3DKMT_WAITFORVERTICALBLANKEVENT *desc);
+ 
+ 
+ #ifdef __cplusplus
