@@ -43,6 +43,11 @@ prepare() {
 
 build() {
   export CROSSCFLAGS="-O2 -pipe" CROSSLDFLAGS="-Wl,-O1"
+  # This package also becomes the prebuilt release (make-release.sh), which must run on any x86-64 CPU:
+  # a makepkg.conf with -march=native (CachyOS's default) put GFNI instructions into win32u.so and winex11.so in 0.5.5.
+  CFLAGS="$(sed -E 's/-march=[^ ]+/-march=x86-64/; s/-mtune=[^ ]+/-mtune=generic/' <<<"$CFLAGS")"
+  CXXFLAGS="$(sed -E 's/-march=[^ ]+/-march=x86-64/; s/-mtune=[^ ]+/-mtune=generic/' <<<"$CXXFLAGS")"
+  export CFLAGS CXXFLAGS
   cd "$srcdir/build"
   "../wine-${_winever}/configure" --prefix=/opt/adobewine/runtime --disable-tests \
       --enable-archs=x86_64,i386 --enable-build-id
