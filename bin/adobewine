@@ -85,6 +85,9 @@ case "$cmd" in
 esac
 # Creative Cloud restores the helper when it updates itself, so this runs at every start.
 use_ie_licensing || true
+# After a failed GPU test, Camera Raw leaves an empty TempDisableGPU2 file and every later start skips the GPU
+# ("Special file 'TempDisableGPU2' found -- skipping GPU2" in the log). Remove it so the GPU is tried again.
+rm -f "$WINEPREFIX"/drive_c/users/*/AppData/Roaming/Adobe/CameraRaw/GPU/*/TempDisableGPU2
 # Linux paths (from a file manager or a .desktop %F) become Windows paths.
 args=()
 for a in "$@"; do
