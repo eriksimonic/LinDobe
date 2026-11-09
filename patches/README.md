@@ -137,3 +137,8 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
   Since 0131 their interior was left unwritten in the uncleared paint buffer and came out black (Lightroom
   Classic's Preferences). Radio buttons and check boxes keep the buffer that 0131 needed.
   tests/paint/gbox.c: before fails 3 (black interior), after fails 0; radiodc still passes.
+- 0138 (2026-11-09): winex11 refreshes an alpha surface after its whole window maps; win32u invalidates
+  the cached shape on a full alpha exposure, including scaled targets. Patch 0108 then uploads the full buffer
+  after mapping, instead of leaving opaque padding around Photoshop's small measurement readouts.
+  tests/layered/alpha-map.c: geometry and transparent-padding hit testing pass before and after, with eight
+  paint events in each Xvfb run. Compositor-added blur is separate; see docs/PHOTOSHOP-OVERLAYS.md.
