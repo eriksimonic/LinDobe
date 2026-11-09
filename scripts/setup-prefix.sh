@@ -164,10 +164,12 @@ for tl in '{D95F7B72-4717-4D59-804E-31D7026366F9}' '{268860D4-B7CB-4DEF-A5D6-F7F
     f=$(wine reg query "HKCR\\TypeLib\\$tl\\1.0\\0\\win32" /ve 2>/dev/null | sed -n 's/.*REG_SZ[[:space:]]*//p' | tr -d '\r') || true  # not registered (fresh prefix): pipefail would end setup here
     [ -n "$f" ] && [ ! -f "$(winepath -u "$f" 2>/dev/null)" ] && wine reg delete "HKCR\\TypeLib\\$tl" /f >/dev/null 2>&1
 done
-# X11 driver (through XWayland on Wayland desktops), and no window-manager decorations:
-# Adobe apps start maximised and a title bar would force a resize that leaves panels undrawn.
+# X11 driver (through XWayland on Wayland desktops). The window manager draws the title bar and border
+# (Decorated Y). Checked with Lightroom Classic on GNOME/Mutter: maximise, minimise, restore and resize
+# all redraw every panel. Other Adobe apps are untested. If one leaves panels undrawn after a resize,
+# set Decorated to N, and Wine draws its own caption.
 wine reg add 'HKCU\Software\Wine\Drivers' /v Graphics /d x11 /f >/dev/null
-wine reg add 'HKCU\Software\Wine\X11 Driver' /v Decorated /d N /f >/dev/null
+wine reg add 'HKCU\Software\Wine\X11 Driver' /v Decorated /d Y /f >/dev/null
 wine reg add 'HKCU\Software\Wine\WineDbg' /v ShowCrashDialog /t REG_DWORD /d 0 /f >/dev/null
 # HiDPI: Wine draws at 96 DPI unless told otherwise, so on a 2x or 1.5x desktop Adobe's UI is tiny.
 [ -n "$DPI" ] || DPI=$(xrdb -query 2>/dev/null | awk '/^Xft\.dpi:/ {printf "%d", $2}') || true  # no xrdb (Flatpak runtime): pipefail would end setup
@@ -176,6 +178,27 @@ case "$DPI" in ''|*[!0-9]*) DPI=96 ;; esac
 wine reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$DPI" /f >/dev/null
 wine reg add 'HKLM\System\CurrentControlSet\Hardware Profiles\Current\Software\Fonts' /v LogPixels /t REG_DWORD /d "$DPI" /f >/dev/null
 echo "UI scaling: $DPI DPI ($(( DPI * 100 / 96 ))%). Change with: adobewine setup --dpi N"
+# Text: ClearType (RGB subpixel) with the Windows default gamma, instead of Wine's grayscale default.
+wine reg add 'HKCU\Control Panel\Desktop' /v FontSmoothing /d 2 /f >/dev/null
+wine reg add 'HKCU\Control Panel\Desktop' /v FontSmoothingType /t REG_DWORD /d 2 /f >/dev/null
+wine reg add 'HKCU\Control Panel\Desktop' /v FontSmoothingGamma /t REG_DWORD /d 1400 /f >/dev/null
+wine reg add 'HKCU\Control Panel\Desktop' /v FontSmoothingOrientation /t REG_DWORD /d 1 /f >/dev/null
+# Dark title bar, menu and border colours (patch 0137 draws the flat frame in the border colours).
+while read -r name rgb; do
+  wine reg add 'HKCU\Control Panel\Colors' /v "$name" /d "$rgb" /f >/dev/null
+done <<'COLORS'
+ActiveTitle 45 45 45
+GradientActiveTitle 45 45 45
+TitleText 225 225 225
+MenuText 225 225 225
+InactiveTitle 32 32 32
+GradientInactiveTitle 32 32 32
+InactiveTitleText 130 130 130
+Menu 45 45 45
+MenuBar 45 45 45
+ActiveBorder 45 45 45
+InactiveBorder 32 32 32
+COLORS
 
 # Fonts from your own Windows installation (Segoe UI and friends).
 if [ -n "$WINFONTS" ]; then
