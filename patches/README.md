@@ -131,5 +131,9 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
   tests/d3d12child/d3d12child.c -underlay: original runtime black then green; candidate red then green after
   D3D12 release, user-confirmed. No source-ID filter or public configuration; a targeted compatibility rule
   based on vkd3d's Vulkan engine name. After Effects' viewer and Animation Composer panel work normally;
-  save/reopen and the three-second render pass with identical frame hashes. Broader Adobe regression
-  coverage is still pending.
+  save/reopen and the three-second render pass with identical frame hashes. LinDobe's click suites pass on it:
+  After Effects 5/5, Premiere 7/7, Photoshop 10/10 (2026-11-09).
+- 0137 (2026-11-09, PR #36, numbered 0139 there): comctl32 group boxes paint straight into the paint DC again.
+  Since 0131 their interior was left unwritten in the uncleared paint buffer and came out black (Lightroom
+  Classic's Preferences). Radio buttons and check boxes keep the buffer that 0131 needed.
+  tests/paint/gbox.c: before fails 3 (black interior), after fails 0; radiodc still passes.
