@@ -1,0 +1,19 @@
+comctl32: Group boxes paint without the paint buffer.
+
+Patch 0131 paints themed buttons between BeginBufferedPaint and EndBufferedPaint. The buffer bitmap is created
+without being cleared, and GB_ThemedPaint excludes the content rect of a group box, so the interior of a group box
+was never written. EndBufferedPaint then copied those undefined pixels over the window, and the group boxes in
+Lightroom Classic's Preferences dialog showed black. Group boxes now paint into the paint DC directly, as before
+0131. Radio buttons and check boxes keep the buffer.
+
+--- a/dlls/comctl32_v6/button.c
++++ b/dlls/comctl32_v6/button.c
+@@ -570,7 +570,7 @@
+              * DrawThemeParentBackground, gets a memory DC, not the button's paint DC. Lightroom Classic's group
+              * boxes call ReleaseDC on the DC they get there, which must not take the paint DC away. */
+             GetClientRect(hWnd, &client);
+-            if (!wParam && (buffer = BeginBufferedPaint(hdc, &client, BPBF_COMPATIBLEBITMAP, NULL, &paint_dc)))
++            if (!wParam && btn_type != BS_GROUPBOX && (buffer = BeginBufferedPaint(hdc, &client, BPBF_COMPATIBLEBITMAP, NULL, &paint_dc)))
+                 hdc = paint_dc;
+             btnThemedPaintFunc[btn_type](theme, infoPtr, hdc, drawState, dtflags, infoPtr->state & BST_FOCUS);
+             if (buffer)
