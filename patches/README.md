@@ -142,3 +142,9 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
   after mapping, instead of leaving opaque padding around Photoshop's small measurement readouts.
   tests/layered/alpha-map.c: geometry and transparent-padding hit testing pass before and after, with eight
   paint events in each Xvfb run. Compositor-added blur is separate; see docs/PHOTOSHOP-OVERLAYS.md.
+- 0140 (2026-11-09): comctl32 ListView returns the mouse wheel to DefWindowProc, which forwards it to the
+  parent, when it has no scrollable range (GetScrollInfo fails or nMax - nMin + 1 <= nPage). Lightroom
+  Classic's Folders list is a ListView inside an outer scroll view, and `LISTVIEW_MouseWheel` consumed
+  every wheel message, so the panel never scrolled. User-confirmed: the panel now scrolls. Open: it
+  scrolls too far per click, because one click sends about 5 to 10 events of -120. Not tested: a ListView
+  with range 0 to 0 and page 0 still consumes the wheel.

@@ -1,0 +1,26 @@
+comctl32: ListView passes the mouse wheel to its parent when it cannot scroll.
+
+Lightroom Classic's Folders panel list view has no scroll range inside its outer scroll view. The list view handled every
+WM_MOUSEWHEEL message and returned 0, so the wheel did nothing over the panel. Now the list view calls DefWindowProc
+when it has no scroll range in the direction the wheel scrolls, and DefWindowProc forwards the message to the parent.
+The check reads the range and page size with GetScrollInfo.
+
+--- a/dlls/comctl32/listview.c
++++ b/dlls/comctl32/listview.c
+@@ -11928,6 +11928,16 @@
+   case WM_MOUSEWHEEL:
+       if (wParam & (MK_SHIFT | MK_CONTROL))
+           return DefWindowProcW(hwnd, uMsg, wParam, lParam);
++      {
++          /* Nothing to scroll in this direction: let the parent handle the wheel */
++          SCROLLINFO si;
++
++          si.cbSize = sizeof(si);
++          si.fMask = SIF_RANGE | SIF_PAGE;
++          if (!GetScrollInfo(hwnd, infoPtr->uView == LV_VIEW_LIST ? SB_HORZ : SB_VERT, &si) ||
++              si.nMax - si.nMin + 1 <= (int)si.nPage)
++              return DefWindowProcW(hwnd, uMsg, wParam, lParam);
++      }
+       return LISTVIEW_MouseWheel(infoPtr, (short int)HIWORD(wParam));
+
+   case WM_WINDOWPOSCHANGED:
