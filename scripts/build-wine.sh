@@ -26,10 +26,12 @@ echo "applied $(ls "$ADOBEWINE_SRC"/patches/*.patch | wc -l) patches"
   git clone --depth 1 https://github.com/KhronosGroup/OpenCL-Headers.git "$ADOBEWINE_HOME/src/OpenCL-Headers"
 export CPPFLAGS="-I$ADOBEWINE_HOME/src/OpenCL-Headers ${CPPFLAGS:-}"
 if command -v ccache >/dev/null; then
+  export CCACHE_DIR="${CCACHE_DIR:-$ADOBEWINE_HOME/ccache}" CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-10G}"
   export CC="ccache gcc" x86_64_CC="ccache x86_64-w64-mingw32-gcc" i386_CC="ccache i686-w64-mingw32-gcc"
 fi
 mkdir -p "$BUILD" && cd "$BUILD"
 [ -f Makefile ] || "$SRC/configure" --prefix="$ADOBEWINE_HOME/runtime" --enable-archs=i386,x86_64 --disable-tests
 make -j"$JOBS"
 make install -j"$JOBS"
+command -v ccache >/dev/null && ccache -s | head -n 8
 "$ADOBEWINE_HOME/runtime/bin/wine" --version

@@ -1,0 +1,244 @@
+win32u: Draw caption buttons and the outer frame flat.
+
+The caption buttons were Marlett glyphs on a 3D push button, and the outer edge was a raised or sunken DrawEdge,
+which put white and light gray lines around the window. The buttons now have no fill and no frame in the normal
+state. Their glyphs are 1 px lines, 40 percent of the button height, in RGB(170,170,170). Pressed, a button shows a
+rounded RGB(75,75,75) fill with a white glyph, and close shows RGB(196,43,28). The outer edge is a solid ring in the
+ActiveBorder or InactiveBorder colour, with the same width as before. Button rectangles, hit testing and the title
+bar height do not change.
+
+--- a/dlls/win32u/defwnd.c
++++ b/dlls/win32u/defwnd.c
+@@ -1280,101 +1280,86 @@
+     }
+ }
+ 
+-static BOOL draw_push_button( HDC dc, RECT *r, UINT flags )
++/* The title bar colour behind the caption buttons, the same as draw_caption_bar paints */
++static int get_caption_bar_index( HWND hwnd )
+ {
+-    RECT rect = *r;
+-    UINT edge;
++    BOOL gradient = FALSE;
++    BOOL active = win_get_flags( hwnd ) & WIN_NCACTIVATED;
+ 
+-    if (flags & (DFCS_PUSHED | DFCS_CHECKED | DFCS_FLAT))
+-        edge = EDGE_SUNKEN;
+-    else
+-        edge = EDGE_RAISED;
++    NtUserSystemParametersInfo( SPI_GETGRADIENTCAPTIONS, 0, &gradient, 0 );
++    if (active) return gradient ? COLOR_GRADIENTACTIVECAPTION : COLOR_ACTIVECAPTION;
++    return gradient ? COLOR_GRADIENTINACTIVECAPTION : COLOR_INACTIVECAPTION;
++}
++
++/* Flat caption button: no fill and no frame over the title bar. Glyphs are 1 px lines, 40% of
++ * the button height. Pressed, a rounded fill (red for close) with a white glyph. */
++static BOOL draw_frame_caption( HDC dc, RECT *r, UINT flags, int bar_index )
++{
++    int type = flags & 0xf;
++    int size = (r->bottom - r->top) * 40 / 100;
++    int xc = (r->left + r->right) / 2;
++    int yc = (r->top + r->bottom) / 2;
++    int l = xc - size / 2, t = yc - size / 2, rt = l + size, b = t + size;
++    int d = size / 3;
++    BOOL pushed = flags & DFCS_PUSHED;
++    COLORREF glyph_color;
++    HBRUSH brush, prev_brush;
++    HPEN pen, prev_pen;
+ 
+-    if (flags & DFCS_CHECKED)
++    if (type != DFCS_CAPTIONCLOSE && type != DFCS_CAPTIONMIN &&
++        type != DFCS_CAPTIONMAX && type != DFCS_CAPTIONRESTORE)
+     {
+-        if (flags & DFCS_MONO)
+-            draw_rect_edge( dc, &rect, edge, BF_MONO|BF_RECT|BF_ADJUST, 1 );
+-        else
+-            draw_rect_edge( dc, &rect, edge, (flags & DFCS_FLAT)|BF_RECT|BF_SOFT|BF_ADJUST, 1 );
+-        if (!(flags & DFCS_TRANSPARENT)) draw_checked_rect( dc, &rect );
++        WARN( "Invalid caption; flags=0x%04x\n", flags );
++        return FALSE;
+     }
+-    else
++
++    fill_rect( dc, r, get_sys_color_brush( bar_index ));
++
++    if (pushed)
+     {
+-        if (flags & DFCS_MONO)
+-        {
+-            draw_rect_edge( dc, &rect, edge, BF_MONO|BF_RECT|BF_ADJUST, 1 );
+-            if (!(flags & DFCS_TRANSPARENT))
+-                fill_rect( dc, &rect, get_sys_color_brush( COLOR_BTNFACE ));
+-        }
+-        else
+-        {
+-            UINT edge_flags = BF_RECT | BF_SOFT | (flags & DFCS_FLAT);
+-            if (!(flags & DFCS_TRANSPARENT)) edge_flags |= BF_MIDDLE;
+-            draw_rect_edge( dc, r, edge, edge_flags, 1 );
+-        }
++        COLORREF fill = type == DFCS_CAPTIONCLOSE ? RGB( 196, 43, 28 ) : RGB( 75, 75, 75 );
++
++        brush = NtGdiCreateSolidBrush( fill, NULL );
++        prev_brush = NtGdiSelectBrush( dc, brush );
++        prev_pen = NtGdiSelectPen( dc, GetStockObject( NULL_PEN ));
++        NtGdiRoundRect( dc, r->left, r->top, r->right, r->bottom, r->bottom - r->top, r->bottom - r->top );
++        NtGdiSelectPen( dc, prev_pen );
++        NtGdiSelectBrush( dc, prev_brush );
++        NtGdiDeleteObjectApp( brush );
+     }
+ 
+-    /* Adjust rectangle if asked */
+-    if (flags & DFCS_ADJUSTRECT) InflateRect( r, -2, -2 );
+-    return TRUE;
+-}
++    if (pushed) glyph_color = RGB( 255, 255, 255 );
++    else if (flags & DFCS_INACTIVE) glyph_color = get_sys_color( COLOR_GRAYTEXT );
++    else glyph_color = RGB( 170, 170, 170 );
+ 
+-static BOOL draw_frame_caption( HDC dc, RECT *r, UINT flags )
+-{
+-    RECT rect;
+-    int small_diam = make_square_rect( r, &rect ) - 2;
+-    HFONT prev_font, font;
+-    int color_idx = flags & DFCS_INACTIVE ? COLOR_BTNSHADOW : COLOR_BTNTEXT;
+-    int xc = (rect.left + rect.right) / 2;
+-    int yc = (rect.top + rect.bottom) / 2;
+-    LOGFONTW lf = { 0 };
+-    WCHAR str[] = {0, 0};
+-    DWORD prev_align, prev_bk;
+-    COLORREF prev_color;
+-    SIZE size;
+-
+-    static const WCHAR marlettW[] = {'M','a','r','l','e','t','t',0};
+-
+-    draw_push_button( dc, r, flags & 0xff00 );
+-
+-    switch (flags & 0xf)
+-    {
+-    case DFCS_CAPTIONCLOSE:    str[0] = 0x72; break;
+-    case DFCS_CAPTIONHELP:     str[0] = 0x73; break;
+-    case DFCS_CAPTIONMIN:      str[0] = 0x30; break;
+-    case DFCS_CAPTIONMAX:      str[0] = 0x31; break;
+-    case DFCS_CAPTIONRESTORE:  str[0] = 0x32; break;
+-    default:
+-        WARN( "Invalid caption; flags=0x%04x\n", flags );
+-        return FALSE;
+-    }
++    pen = NtGdiCreatePen( PS_SOLID, 1, glyph_color, NULL );
++    prev_pen = NtGdiSelectPen( dc, pen );
++    prev_brush = NtGdiSelectBrush( dc, GetStockObject( NULL_BRUSH ));
+ 
+-    lf.lfHeight = -small_diam;
+-    lf.lfWeight = FW_NORMAL;
+-    lf.lfCharSet = SYMBOL_CHARSET;
+-    lf.lfPitchAndFamily = FIXED_PITCH | FF_DONTCARE;
+-    memcpy( lf.lfFaceName, marlettW, sizeof(marlettW) );
+-    font = NtGdiHfontCreate( &lf, sizeof(lf), 0, 0, NULL );
+-    NtGdiGetAndSetDCDword( dc, NtGdiSetTextAlign, TA_TOP | TA_LEFT, &prev_align );
+-    NtGdiGetAndSetDCDword( dc, NtGdiSetBkMode, TRANSPARENT, &prev_bk );
+-    NtGdiGetDCDword( dc, NtGdiGetTextColor, &prev_color );
+-    prev_font = NtGdiSelectFont( dc, font );
+-    NtGdiGetTextExtentExW( dc, str, 1, 0, NULL, NULL, &size, 0 );
+-
+-    if (flags & DFCS_INACTIVE)
+-    {
+-        NtGdiGetAndSetDCDword( dc, NtGdiSetTextColor, get_sys_color(COLOR_BTNHIGHLIGHT), NULL );
+-        NtGdiExtTextOutW( dc, xc-size.cx/2+1, yc-size.cy/2+1, 0, NULL, str, 1, NULL, 0 );
+-    }
+-    NtGdiGetAndSetDCDword( dc, NtGdiSetTextColor, get_sys_color( color_idx ), NULL );
+-    NtGdiExtTextOutW( dc, xc-size.cx/2, yc-size.cy/2, 0, NULL, str, 1, NULL, 0 );
+-
+-    NtGdiSelectFont(dc, prev_font);
+-    NtGdiGetAndSetDCDword( dc, NtGdiSetTextColor, prev_color, NULL );
+-    NtGdiGetAndSetDCDword( dc, NtGdiSetTextAlign, prev_align, NULL );
+-    NtGdiGetAndSetDCDword( dc, NtGdiSetBkMode, prev_bk, NULL );
+-    NtGdiDeleteObjectApp( font );
++    switch (type)
++    {
++    case DFCS_CAPTIONCLOSE:
++        NtGdiMoveTo( dc, l, t, NULL );
++        NtGdiLineTo( dc, rt, b );
++        NtGdiMoveTo( dc, rt - 1, t, NULL );
++        NtGdiLineTo( dc, l - 1, b );
++        break;
++    case DFCS_CAPTIONMIN:
++        NtGdiMoveTo( dc, l, yc, NULL );
++        NtGdiLineTo( dc, rt, yc );
++        break;
++    case DFCS_CAPTIONMAX:
++        NtGdiRectangle( dc, l, t, rt, b );
++        break;
++    case DFCS_CAPTIONRESTORE:
++        NtGdiRectangle( dc, l + d, t, rt, b - d );
++        NtGdiRectangle( dc, l, t + d, rt - d, b );
++        break;
++    }
+ 
++    NtGdiSelectBrush( dc, prev_brush );
++    NtGdiSelectPen( dc, prev_pen );
++    NtGdiDeleteObjectApp( pen );
+     return TRUE;
+ }
+ 
+@@ -1497,7 +1482,7 @@
+ 
+     if (down) flags |= DFCS_PUSHED;
+     if (grayed) flags |= DFCS_INACTIVE;
+-    draw_frame_caption( hdc, &rect, flags );
++    draw_frame_caption( hdc, &rect, flags, get_caption_bar_index( hwnd ));
+ }
+ 
+ static void draw_max_button( HWND hwnd, HDC hdc, BOOL down, BOOL grayed )
+@@ -1520,7 +1505,7 @@
+     rect.right -= 2;
+     if (down) flags |= DFCS_PUSHED;
+     if (grayed) flags |= DFCS_INACTIVE;
+-    draw_frame_caption( hdc, &rect, flags );
++    draw_frame_caption( hdc, &rect, flags, get_caption_bar_index( hwnd ));
+ }
+ 
+ static void draw_min_button( HWND hwnd, HDC hdc, BOOL down, BOOL grayed )
+@@ -1546,7 +1531,7 @@
+     rect.right -= 2;
+     if (down) flags |= DFCS_PUSHED;
+     if (grayed) flags |= DFCS_INACTIVE;
+-    draw_frame_caption( hdc, &rect, flags );
++    draw_frame_caption( hdc, &rect, flags, get_caption_bar_index( hwnd ));
+ }
+ 
+ static void draw_nc_caption( HDC hdc, RECT *rect, HWND hwnd, DWORD  style,
+@@ -1715,6 +1700,20 @@
+     return FALSE;
+ }
+ 
++/* Paint a flat outer edge of the given width in the active or inactive border colour, and shrink rect */
++static void draw_flat_edge( HDC hdc, RECT *rect, BOOL active, int width )
++{
++    HBRUSH prev_brush = NtGdiSelectBrush( hdc, get_sys_color_brush( active ? COLOR_ACTIVEBORDER :
++                                                                    COLOR_INACTIVEBORDER ));
++
++    NtGdiPatBlt( hdc, rect->left, rect->top, rect->right - rect->left, width, PATCOPY );
++    NtGdiPatBlt( hdc, rect->left, rect->bottom - width, rect->right - rect->left, width, PATCOPY );
++    NtGdiPatBlt( hdc, rect->left, rect->top, width, rect->bottom - rect->top, PATCOPY );
++    NtGdiPatBlt( hdc, rect->right - width, rect->top, width, rect->bottom - rect->top, PATCOPY );
++    NtGdiSelectBrush( hdc, prev_brush );
++    InflateRect( rect, -width, -width );
++}
++
+ /* Paint the non-client area for windows */
+ static void nc_paint( HWND hwnd, HRGN clip )
+ {
+@@ -1762,10 +1761,11 @@
+ 
+     NtGdiSelectPen( hdc, get_sys_color_pen( COLOR_WINDOWFRAME ));
+ 
++    /* 1 px for a sunken outer edge, 2 px for a raised one, as DrawEdge drew them */
+     if (has_static_outer_frame( ex_style ))
+-        draw_rect_edge( hdc, &rect, BDR_SUNKENOUTER, BF_RECT | BF_ADJUST, 1 );
++        draw_flat_edge( hdc, &rect, active, 1 );
+     else if (has_big_frame( style, ex_style ))
+-        draw_rect_edge( hdc, &rect, EDGE_RAISED, BF_RECT | BF_ADJUST, 1 );
++        draw_flat_edge( hdc, &rect, active, 2 );
+ 
+     draw_nc_frame( hdc, &rect, active, style, ex_style );
+ 

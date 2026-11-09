@@ -150,6 +150,19 @@ gpu_note() {
   echo "Only $free MiB of video memory is free (${users:-other programs}). Panels may stay blank and exports may fail; close what you don't need."
 }
 case "$cmd" in premiere|aftereffects|encoder) gpu_note ;; esac
+# UI scale: follow the desktop's scale (Xft.dpi) at every start. ADOBEWINE_DPI=N overrides it.
+# Wine reads LogPixels at startup only, so a scale change needs a restart of the app.
+sync_dpi() {
+  local dpi="${ADOBEWINE_DPI:-$(xrdb -query 2>/dev/null | awk '/^Xft\.dpi:/ {printf "%d", $2}')}" hex
+  case "$dpi" in ''|*[!0-9]*) return ;; esac
+  [ "$dpi" -lt 96 ] && dpi=96; [ "$dpi" -gt 288 ] && dpi=288
+  hex=$(printf 'dword:%08x' "$dpi")
+  grep -qs "\"LogPixels\"=$hex" "$WINEPREFIX/user.reg" && grep -qs "\"LogPixels\"=$hex" "$WINEPREFIX/system.reg" && return
+  wine reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$dpi" /f >/dev/null
+  wine reg add 'HKLM\System\CurrentControlSet\Hardware Profiles\Current\Software\Fonts' /v LogPixels /t REG_DWORD /d "$dpi" /f >/dev/null
+  echo "UI scaling: $dpi DPI ($(( dpi * 100 / 96 ))%)"
+}
+sync_dpi
 log="$ADOBEWINE_HOME/logs/$cmd-$(date +%Y%m%d-%H%M%S).log"
 echo "log: $log"
 start=$SECONDS
