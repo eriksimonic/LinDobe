@@ -117,3 +117,19 @@ All other 84 patches are byte-identical copies of wine/patches (some apply at a 
   "Intel Device Information" counter (Intel GPUDetect protocol: Version 2, Size 24, GPU generation from the PCI id) on
   Intel adapters. Premiere reads it and otherwise rejects Intel GPUs as "Hardware out of date". With 0127 and 0128,
   Premiere renders with OpenCL on an Iris Xe (7/7 real-click tests).
+- 0134 (2026-11-08): dxgi WaitForVBlank uses the existing D3DKMT wait from 0047. JUCE 8.0.10's VBlankThread
+  in Mister Horse Product Manager 3.7.7 otherwise cannot finish shutdown while constructing its window.
+  tests/vblank/dxgi.c: two attached outputs change from E_NOTIMPL to successful waits. Refresh-based pacing,
+  not hardware synchronization; see docs/MISTER-HORSE.md for remaining rendering limitations.
+- 0135 (2026-11-08): kernelbase/kernel32 export ReadDirectoryChangesExW. Basic notifications use the existing
+  implementation; extended records explicitly return ERROR_INVALID_FUNCTION. Animation Composer 4.2.6 then
+  takes its existing ReadDirectoryChangesW fallback instead of aborting After Effects on a missing import.
+  tests/directory-notify/ex.c: basic asynchronous file creation and unsupported extended-format handling pass;
+  the plugin opens, applies a free preset, saves/reopens, and renders the three-second acceptance project.
+- 0136 (2026-11-08): win32u gives a successfully presented vkd3d surface ownership of that HWND until its
+  swapchain/surface is destroyed. After Effects' D3D11 target otherwise paints black over the D3D12 viewer.
+  tests/d3d12child/d3d12child.c -underlay: original runtime black then green; candidate red then green after
+  D3D12 release, user-confirmed. No source-ID filter or public configuration; a targeted compatibility rule
+  based on vkd3d's Vulkan engine name. After Effects' viewer and Animation Composer panel work normally;
+  save/reopen and the three-second render pass with identical frame hashes. Broader Adobe regression
+  coverage is still pending.
