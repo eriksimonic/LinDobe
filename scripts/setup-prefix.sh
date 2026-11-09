@@ -152,6 +152,11 @@ done
 # own dxgi has composition swapchains (patches 0050, 0051), DXVK does not.
 wine reg add 'HKCU\Software\Wine\AppDefaults\msedgewebview2.exe\DllOverrides' /v dxgi /d builtin /f >/dev/null
 wine reg add 'HKCU\Software\Wine\AppDefaults\msedgewebview2.exe\DllOverrides' /v d3d11 /d builtin /f >/dev/null
+# Product Manager's JUCE interface also needs composition swapchains, with Wine's Vulkan renderer.
+for dll in dxgi d3d11 d3d10core; do
+  wine reg add 'HKCU\Software\Wine\AppDefaults\ProductManager.exe\DllOverrides' /v "$dll" /d builtin /f >/dev/null
+done
+wine reg add 'HKCU\Software\Wine\AppDefaults\ProductManager.exe\Direct3D' /v renderer /d vulkan /f >/dev/null
 # InDesign's scripting type library: before patch 0088 Wine could not save it, but InDesign had registered it, and it
 # rebuilds the file only when the registration is gone. A registration whose file is missing is removed here, so
 # InDesign writes the library on its next start and can be scripted over COM (DoScript).
