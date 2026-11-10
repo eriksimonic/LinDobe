@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Files dragged in from the file manager import into After Effects.** Dropping images on the Project panel or the Composition viewer did nothing unless the drag happened to enter over the Project panel: during a drag, Wine reported a stale mouse position, and After Effects uses the mouse position to decide where a drop lands. Wine now reports the drag's position while a drag is in progress. Patch 0139. Contributed in #39.
+
 - **A file opened from the file manager reaches an Adobe app that is already running at once.** The launcher used to wait 10 seconds first; now only a leftover process without a window gets that wait. Contributed in #37.
 
 - **Group boxes are no longer black inside.** Since patch 0131, every themed group box, such as the ones in Lightroom Classic's Preferences, showed a solid black interior. Patch 0137. Contributed in #36.
