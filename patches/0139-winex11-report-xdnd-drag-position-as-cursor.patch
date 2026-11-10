@@ -1,0 +1,93 @@
+winex11: Report the XDND drag position as the cursor position.
+
+When a file is dragged into a Wine window from another X client, Wine gets no pointer events during the drag: the
+source holds the pointer, and with a Wayland source (a file manager under XWayland) the X pointer does not even move.
+GetCursorPos then asked XQueryPointer and returned a stale point (or 0,0). Apps that hit-test the cursor during a drop
+instead of using the IDropTarget point got it wrong: After Effects ignored files dropped on its Project panel and
+Composition viewer, except when the drag had entered over the Project panel (public #39).
+
+Each XdndPosition now stores its point and marks a drag in progress; XdndDrop and XdndLeave clear it. While a drag is
+in progress, X11DRV_GetCursorPos returns the stored point. Nothing is warped or injected. Contributed in #39.
+
+Test: tests/dragdrop/dragpos.c logs the IDropTarget point next to GetCursorPos during a drag (before: 0,0 during the
+drag; after: the drag position).
+
+--- a/dlls/winex11.drv/event.c
++++ b/dlls/winex11.drv/event.c
+@@ -1413,6 +1413,28 @@
+ }
+ 
+ 
++/* While an XDND drag is over one of our windows, the X pointer does not follow it when the source
++ * is a Wayland client (XWayland keeps the last pointer position until the drop), so GetCursorPos
++ * reported where the drag entered. Windows apps that hit-test the cursor during a drag (After
++ * Effects) then saw every drop at that stale point. Report the drag position instead. */
++static volatile LONG xdnd_tracking;
++static volatile LONG xdnd_pos_x, xdnd_pos_y;
++
++BOOL xdnd_get_drag_pos( POINT *pos )
++{
++    if (!xdnd_tracking) return FALSE;
++    pos->x = xdnd_pos_x;
++    pos->y = xdnd_pos_y;
++    return TRUE;
++}
++
++static void xdnd_set_drag_pos( POINT pt )
++{
++    xdnd_pos_x = pt.x;
++    xdnd_pos_y = pt.y;
++    xdnd_tracking = 1;
++}
++
+ /**************************************************************************
+  *           handle_xdnd_enter_event
+  *
+@@ -1526,6 +1548,7 @@
+     UINT effect;
+ 
+     point = root_to_virtual_screen( event->data.l[2] >> 16, event->data.l[2] & 0xFFFF );
++    xdnd_set_drag_pos( point );
+     effect = xdnd_action_to_drop_effect( event->data.l[4] );
+     effect = drag_drop_drag( hwnd, point, effect );
+ 
+@@ -1556,6 +1579,7 @@
+     UINT effect;
+ 
+     effect = drag_drop_drop( hwnd );
++    xdnd_tracking = 0;
+ 
+     /* Tell the target we are finished. */
+     memset( &e, 0, sizeof(e) );
+@@ -1573,6 +1597,7 @@
+ 
+ static void handle_xdnd_leave_event( HWND hwnd, XClientMessageEvent *event )
+ {
++    xdnd_tracking = 0;
+     drag_drop_leave();
+ }
+ 
+--- a/dlls/winex11.drv/mouse.c
++++ b/dlls/winex11.drv/mouse.c
+@@ -1677,6 +1677,11 @@
+     unsigned int xstate;
+     BOOL ret;
+ 
++    if (xdnd_get_drag_pos( pos ))
++    {
++        TRACE( "drag in progress, pointer at %s\n", wine_dbgstr_point(pos) );
++        return TRUE;
++    }
+     ret = XQueryPointer( display, root_window, &root, &child, &rootX, &rootY, &winX, &winY, &xstate );
+     if (ret)
+     {
+--- a/dlls/winex11.drv/x11drv.h
++++ b/dlls/winex11.drv/x11drv.h
+@@ -217,6 +217,7 @@
+ extern void X11DRV_SetCursor( HWND hwnd, HCURSOR handle );
+ extern BOOL X11DRV_SetCursorPos( INT x, INT y );
+ extern BOOL X11DRV_GetCursorPos( LPPOINT pos );
++extern BOOL xdnd_get_drag_pos( POINT *pos );
+ extern BOOL X11DRV_ClipCursor( const RECT *clip, BOOL reset );
+ extern void X11DRV_SystrayDockInit( HWND systray );
+ extern BOOL X11DRV_SystrayDockInsert( HWND owner, UINT cx, UINT cy, void *icon );
