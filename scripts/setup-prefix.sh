@@ -218,11 +218,13 @@ elif ! ls "$WINEPREFIX/drive_c/windows/Fonts/"segoeui.ttf >/dev/null 2>&1; then
   fi
 fi
 "$ADOBEWINE_SRC/scripts/register-fonts.sh"
-# ADOBEWINE_LINK_DLLS=1 (the Flatpak sets it): Wine's own DLLs in system32/syswow64 become links to the runtime
-# instead of copies, as Proton does (about 1.8 GB less per prefix). Only files identical to the runtime's are
-# linked, so DXVK, vkd3d-proton, nvidia-libs and winetricks' native DLLs stay real files. Meant for a runtime
-# nobody writes to (the Flatpak's /app); after a runtime update the links simply point at the new files.
-if [ "${ADOBEWINE_LINK_DLLS:-0}" = 1 ]; then
+# Wine's own DLLs in system32/syswow64 become links to the runtime instead of copies, as Proton does (about 1.8 GB
+# less per prefix). Only with ADOBEWINE_LINK_DLLS=1 (the Flatpak sets it) and a runtime whose lib/wine is not writable
+# (the Flatpak's read-only /app). Only files identical to the runtime's are linked, so DXVK, vkd3d-proton, nvidia-libs
+# and winetricks' native DLLs stay real files. With a writable runtime, Wine's prefix update writes through the links
+# and overwrites or deletes runtime files, so the DLLs stay real files there. After a runtime update the links point
+# at the new files.
+if [ "${ADOBEWINE_LINK_DLLS:-0}" = 1 ] && [ ! -w "$ADOBEWINE_RUNTIME/lib/wine" ]; then
   wineserver -w
   n=0
   for pair in "system32:x86_64-windows" "syswow64:i386-windows"; do

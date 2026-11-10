@@ -165,7 +165,43 @@ sync_dpi() {
   wine reg add 'HKLM\System\CurrentControlSet\Hardware Profiles\Current\Software\Fonts' /v LogPixels /t REG_DWORD /d "$dpi" /f >/dev/null
   echo "UI scaling: $dpi DPI ($(( dpi * 100 / 96 ))%)"
 }
+# Fonts registered inside the Flatpak point at Z:\app\adobewine\..., a path that exists only in the sandbox. Outside it
+# DirectWrite cannot load them and Creative Cloud crashes. Values in the Fonts keys get the plain file name. Values in
+# External Fonts are removed, because Wine does not add them back. With no match this is one grep.
+fix_flatpak_fonts() {
+  [ -e /.flatpak-info ] && return
+  grep -qsF 'Z:\\app\\adobewine' "$WINEPREFIX/system.reg" "$WINEPREFIX/user.reg" || return
+  local file section line name data plain n=0
+  local -a lines
+  for file in system.reg user.reg; do
+    [ -f "$WINEPREFIX/$file" ] || continue
+    mapfile -t lines < "$WINEPREFIX/$file"
+    section=
+    for line in "${lines[@]}"; do
+      case "$line" in
+        '['*) section=${line#\[}; section=${section%%\]*}; continue ;;
+      esac
+      [[ $line == \"*\"=\"*\" ]] || continue
+      name=${line#\"}; name=${name%%\"=\"*}
+      data=${line#*\"=\"}; data=${data%\"}
+      case "$data" in 'Z:\\app\\adobewine\\runtime\\share\\wine\\fonts\\'*) ;; *) continue ;; esac
+      plain=${data##*\\}
+      case "$section" in
+        'Software\\Wine\\Fonts\\External Fonts')
+          wine reg delete 'HKCU\Software\Wine\Fonts\External Fonts' /v "$name" /f </dev/null >/dev/null ;;
+        'Software\\Microsoft\\Windows\\CurrentVersion\\Fonts')
+          wine reg add 'HKLM\Software\Microsoft\Windows\CurrentVersion\Fonts' /v "$name" /t REG_SZ /d "$plain" /f </dev/null >/dev/null ;;
+        'Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts')
+          wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' /v "$name" /t REG_SZ /d "$plain" /f </dev/null >/dev/null ;;
+        *) continue ;;
+      esac
+      n=$((n + 1))
+    done
+  done
+  if [ "$n" -gt 0 ]; then echo "Fonts: fixed $n registry value(s) that pointed into the Flatpak"; fi
+}
 sync_dpi
+fix_flatpak_fonts
 log="$ADOBEWINE_HOME/logs/$cmd-$(date +%Y%m%d-%H%M%S).log"
 echo "log: $log"
 start=$SECONDS
