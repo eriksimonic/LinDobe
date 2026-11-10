@@ -183,7 +183,7 @@ wine reg add 'HKCU\Control Panel\Desktop' /v FontSmoothing /d 2 /f >/dev/null
 wine reg add 'HKCU\Control Panel\Desktop' /v FontSmoothingType /t REG_DWORD /d 2 /f >/dev/null
 wine reg add 'HKCU\Control Panel\Desktop' /v FontSmoothingGamma /t REG_DWORD /d 1400 /f >/dev/null
 wine reg add 'HKCU\Control Panel\Desktop' /v FontSmoothingOrientation /t REG_DWORD /d 1 /f >/dev/null
-# Dark title bar, menu and border colours (patch 0137 draws the flat frame in the border colours).
+# Dark title bar, menu and border colours (patch 0141 draws the flat frame in the border colours).
 while read -r name rgb; do
   wine reg add 'HKCU\Control Panel\Colors' /v "$name" /d "$rgb" /f >/dev/null
 done <<'COLORS'

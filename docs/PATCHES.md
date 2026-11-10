@@ -125,3 +125,5 @@ to WineHQ; help with that is very welcome.
 | 0136 | win32u | Keep vkd3d's presentation visible when another client surface targets the same HWND; release ownership with the swapchain. Mixed probe and After Effects/Animation Composer playback, save/reopen and render pass; After Effects 5/5, Premiere 7/7 and Photoshop 10/10 in LinDobe's click suites |
 | 0137 | comctl32 | Group boxes paint without the paint buffer from 0131, so their interior is no longer black (Lightroom Classic's Preferences, and every themed group box). By a contributor in #36 |
 | 0138 | winex11, win32u | Refresh cached alpha surfaces after mapping and invalidate their cached shape for a full exposure, so Photoshop's measurement overlays do not retain black padding. Reproducer and compositor notes: [PHOTOSHOP-OVERLAYS.md](PHOTOSHOP-OVERLAYS.md) |
+| 0140 | comctl32 | A ListView that cannot scroll passes the mouse wheel to its parent, so Lightroom Classic's Folders panel scrolls |
+| 0141 | win32u | Flat caption buttons and a flat window frame, drawn in the border colours, without the 3D edge lines |
