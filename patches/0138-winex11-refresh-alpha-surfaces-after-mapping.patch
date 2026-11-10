@@ -1,0 +1,91 @@
+Subject: [PATCH] winex11: Refresh alpha surfaces after mapping.
+
+An alpha surface can be flushed before its X window is viewable. At map
+time, the backing pixmap may therefore lack pixels outside the cached
+alpha-derived bounding shape. Expose events cover only the shape, while
+0108 uploads outside it only when the shape changes. Photoshop's
+measurement and smart-guide labels can retain black 256x256 boxes.
+
+Request one full cached-surface exposure after an alpha whole-window map.
+A full alpha exposure invalidates the cached shape, including a scaled
+surface's target, so the existing 0108 path uploads the complete buffer.
+Ordinary rectangular expose events keep their existing behavior. The
+window-data lock is released before the surface is exposed; the flush
+path does not acquire that driver lock. No server grab, timer, application
+setting, or graphics-driver ABI change is needed.
+
+This addresses the black backing pixels. Compositor-added background blur
+is separate and is not disabled by this patch.
+
+diff --git a/dlls/winex11.drv/event.c b/dlls/winex11.drv/event.c
+--- a/dlls/winex11.drv/event.c
++++ b/dlls/winex11.drv/event.c
+@@ -889,6 +889,7 @@
+ static BOOL X11DRV_MapNotify( HWND hwnd, XEvent *event )
+ {
+     struct x11drv_win_data *data;
++    BOOL refresh_alpha;
+ 
+     if (event->xany.window == x11drv_thread_data()->clip_window) return TRUE;
+ 
+@@ -905,7 +906,9 @@
+         if (hwndFocus && NtUserIsChild( hwnd, hwndFocus ))
+             set_input_focus( data );
+     }
++    refresh_alpha = data->whole_window == event->xany.window && data->use_alpha;
+     release_win_data( data );
++    if (refresh_alpha) NtUserExposeWindowSurface( hwnd, 0, NULL );
+     return TRUE;
+ }
+ 
+diff --git a/dlls/win32u/dce.c b/dlls/win32u/dce.c
+--- a/dlls/win32u/dce.c
++++ b/dlls/win32u/dce.c
+@@ -516,6 +516,20 @@
+     NtGdiDeleteObjectApp( surface->shape_bitmap );
+     surface->shape_bitmap = 0;
+     return TRUE;
++}
++
++/* The caller holds the surface lock. */
++void window_surface_invalidate_shape( struct window_surface *surface )
++{
++    if (surface->funcs == &scaled_surface_funcs)
++    {
++        struct window_surface *target = get_scaled_surface( surface )->target_surface;
++
++        window_surface_lock( target );
++        window_surface_invalidate_shape( target );
++        window_surface_unlock( target );
++    }
++    clear_surface_shape( surface );
+ }
+ 
+ static BOOL update_surface_shape( struct window_surface *surface, const RECT *rect, const RECT *dirty,
+diff --git a/dlls/win32u/window.c b/dlls/win32u/window.c
+--- a/dlls/win32u/window.c
++++ b/dlls/win32u/window.c
+@@ -2623,7 +2623,11 @@
+     }
+ 
+     window_surface_lock( surface );
+-    if (!rect) add_bounds_rect( &surface->bounds, &surface->rect );
++    if (!rect)
++    {
++        if (surface->alpha_mask) window_surface_invalidate_shape( surface );
++        add_bounds_rect( &surface->bounds, &surface->rect );
++    }
+     else
+     {
+         OffsetRect( &exposed_rect, rects.client.left - rects.visible.left, rects.client.top - rects.visible.top );
+diff --git a/dlls/win32u/win32u_private.h b/dlls/win32u/win32u_private.h
+--- a/dlls/win32u/win32u_private.h
++++ b/dlls/win32u/win32u_private.h
+@@ -59,6 +59,7 @@
+ extern void window_surface_lock( struct window_surface *surface );
+ extern void window_surface_unlock( struct window_surface *surface );
+ extern void window_surface_flush( struct window_surface *surface );
++extern void window_surface_invalidate_shape( struct window_surface *surface );
+ extern void window_surface_set_clip( struct window_surface *surface, HRGN clip_region );
+ extern void window_surface_set_layered( struct window_surface *surface, COLORREF color_key, UINT alpha_bits, UINT alpha_mask );
+ 
