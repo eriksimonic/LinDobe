@@ -36,8 +36,18 @@ if [ "${ADOBEWINE_NVIDIA_OFFLOAD:-auto}" = 1 ] || { [ "${ADOBEWINE_NVIDIA_OFFLOA
   export __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __VK_LAYER_NV_optimus=NVIDIA_only
 fi
 [ -e /proc/driver/nvidia/version ] && export DXVK_ENABLE_NVAPI=1
+# Hide Mesa's CPU Vulkan driver (lavapipe) when a real GPU exists. Wine registers it as a second GPU (VEN_0005) and
+# dxcore reports it as hardware, so Windows ML (DxO PureRAW 6) picks it; DXVK hides it, D3D12 device creation fails
+# ("Adapter with luid ... not found") and inference falls back to the CPU.
+if ls /dev/dri/renderD* >/dev/null 2>&1; then export VK_LOADER_DRIVERS_DISABLE="${VK_LOADER_DRIVERS_DISABLE-*lvp*}"; fi
 # AMD's OpenCL rejects some of Premiere's kernels without this, and those clips scrub black (#15). Only AMD's driver reads it.
 export AMD_OCL_BUILD_OPTIONS_APPEND="${AMD_OCL_BUILD_OPTIONS_APPEND--Wf,-Wno-error=incompatible-pointer-types}"
+
+# DxO PureRAW 6 (Qt 6): Qt Quick's D3D11 swapchain fails under DXVK (white window), so Qt draws with OpenGL.
+# Qt WebEngine with OpenGL then needs WGL_NV_DX_interop, which Wine lacks (crash), so WebEngine renders on the CPU.
+# Lightroom starts PureRAW from its plugin, so these must be in every app's environment. No Adobe app uses Qt Quick.
+export QSG_RHI_BACKEND="${QSG_RHI_BACKEND-opengl}"
+export QTWEBENGINE_CHROMIUM_FLAGS="${QTWEBENGINE_CHROMIUM_FLAGS---disable-gpu --disable-gpu-compositing}"
 
 # Creative Cloud and its helpers write to heap blocks after freeing them; patch 0032 keeps
 # freed blocks out of reuse for a while in these processes only.

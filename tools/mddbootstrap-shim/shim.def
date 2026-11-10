@@ -1,0 +1,6 @@
+LIBRARY Microsoft.WindowsAppRuntime.Bootstrap.dll
+EXPORTS
+    MddBootstrapInitialize
+    MddBootstrapInitialize2
+    MddBootstrapShutdown
+    MddBootstrapTestInitialize

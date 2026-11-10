@@ -1,0 +1,102 @@
+dxcore: Report the adapter memory budget and accept memory reservations.
+
+IDXCoreAdapter::QueryState and SetState returned E_NOTIMPL for every state. Windows ML, used by DxO PureRAW 6, queries
+AdapterMemoryBudget and then sets a memory reservation while it sets up the GPU. It takes either error as a failed
+device ("Device Initialization : Not implemented") and runs inference on the CPU.
+
+QueryState now answers AdapterMemoryBudget: the budget is the dedicated video memory for the local segment group and
+the shared system memory for the non-local one, with no usage, and the reservation last set. SetState stores the
+reservation per segment group without enforcing it. IsQueryStateSupported and IsSetStateSupported return TRUE for
+AdapterMemoryBudget.
+
+--- a/dlls/dxcore/dxcore.c
++++ b/dlls/dxcore/dxcore.c
+@@ -40,6 +40,7 @@
+ 
+     struct wined3d_adapter_identifier identifier;
+     char driver_description[128];
++    UINT64 reservation[2]; /* SetState(AdapterMemoryBudget), per DXCoreSegmentGroup */
+ };
+ 
+ static inline struct dxcore_adapter *impl_from_IDXCoreAdapter(IDXCoreAdapter *iface)
+@@ -270,30 +271,74 @@
+ 
+ static BOOL STDMETHODCALLTYPE dxcore_adapter_IsQueryStateSupported(IDXCoreAdapter *iface, DXCoreAdapterState property)
+ {
+-    FIXME("iface %p, property %u stub!\n", iface, property);
++    TRACE("iface %p, property %u.\n", iface, property);
++
++    if (property == AdapterMemoryBudget)
++        return TRUE;
++    FIXME("Unhandled state %u.\n", property);
+     return FALSE;
+ }
+ 
+ static HRESULT STDMETHODCALLTYPE dxcore_adapter_QueryState(IDXCoreAdapter *iface, DXCoreAdapterState state, size_t state_details_size,
+         const void *state_details, size_t buffer_size, void *buffer)
+ {
+-    FIXME("iface %p, state %u, state_details_size %Iu, state_details %p, buffer_size %Iu, buffer %p stub!\n",
++    struct dxcore_adapter *adapter = impl_from_IDXCoreAdapter(iface);
++    const DXCoreAdapterMemoryBudgetNodeSegmentGroup *group = state_details;
++    DXCoreAdapterMemoryBudget *budget = buffer;
++
++    TRACE("iface %p, state %u, state_details_size %Iu, state_details %p, buffer_size %Iu, buffer %p.\n",
+             iface, state, state_details_size, state_details, buffer_size, buffer);
+-    return E_NOTIMPL;
++
++    if (state != AdapterMemoryBudget)
++    {
++        FIXME("Unhandled state %u.\n", state);
++        return E_NOTIMPL;
++    }
++    if (!group || state_details_size < sizeof(*group) || !budget || buffer_size < sizeof(*budget))
++        return E_INVALIDARG;
++
++    /* No usage tracking: report the whole segment as the budget, nothing used. Windows ML (DxO PureRAW 6) treats the
++     * E_NOTIMPL this returned before as a failed device and runs inference on the CPU. */
++    memset(budget, 0, sizeof(*budget));
++    budget->budget = group->segmentGroup == Local ? adapter->identifier.video_memory
++            : adapter->identifier.shared_system_memory;
++    budget->availableForReservation = budget->budget / 2;
++    if (group->segmentGroup <= NonLocal)
++        budget->currentReservation = adapter->reservation[group->segmentGroup];
++    return S_OK;
+ }
+ 
+ static BOOL STDMETHODCALLTYPE dxcore_adapter_IsSetStateSupported(IDXCoreAdapter *iface, DXCoreAdapterState property)
+ {
+-    FIXME("iface %p, property %u stub!\n", iface, property);
++    TRACE("iface %p, property %u.\n", iface, property);
++
++    if (property == AdapterMemoryBudget)
++        return TRUE;
++    FIXME("Unhandled state %u.\n", property);
+     return FALSE;
+ }
+ 
+ static HRESULT STDMETHODCALLTYPE dxcore_adapter_SetState(IDXCoreAdapter *iface, DXCoreAdapterState state, size_t state_details_size,
+         const void *state_details, size_t buffer_size, const void *buffer)
+ {
+-    FIXME("iface %p, state %u, state_details_size %Iu, state_details %p, buffer_size %Iu, buffer %p stub!\n",
++    struct dxcore_adapter *adapter = impl_from_IDXCoreAdapter(iface);
++    const DXCoreAdapterMemoryBudgetNodeSegmentGroup *group = state_details;
++
++    TRACE("iface %p, state %u, state_details_size %Iu, state_details %p, buffer_size %Iu, buffer %p.\n",
+             iface, state, state_details_size, state_details, buffer_size, buffer);
+-    return E_NOTIMPL;
++
++    if (state != AdapterMemoryBudget)
++    {
++        FIXME("Unhandled state %u.\n", state);
++        return E_NOTIMPL;
++    }
++    if (!group || state_details_size < sizeof(*group) || !buffer || buffer_size < sizeof(UINT64)
++            || group->segmentGroup > NonLocal)
++        return E_INVALIDARG;
++
++    /* A memory reservation (the D3D12 SetVideoMemoryReservation value). Nothing enforces it; QueryState reports it. */
++    adapter->reservation[group->segmentGroup] = *(const UINT64 *)buffer;
++    return S_OK;
+ }
+ 
+ static HRESULT STDMETHODCALLTYPE dxcore_adapter_GetFactory(IDXCoreAdapter *iface, REFIID riid, void **out)
